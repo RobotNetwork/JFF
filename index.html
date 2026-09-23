@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Journal Entry Formatter</title>
+        <link
+            rel="icon"
+            href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗃️</text></svg>"
+        />
+
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+
+    <body>
+        <header>
+            <h1>Journal Entry Formatter</h1>
+            <span>Rich text → ServiceNow journal [code] markup</span>
+        </header>
+
+        <main>
+            <div class="pane">
+                <div class="toolbar" id="toolbar">
+                    <button
+                        type="button"
+                        data-cmd="bold"
+                        title="Bold (Ctrl+B)"
+                        aria-pressed="false"
+                    >
+                        <b>B</b>
+                    </button>
+
+                    <button
+                        type="button"
+                        data-cmd="italic"
+                        title="Italic (Ctrl+I)"
+                        aria-pressed="false"
+                    >
+                        <i>I</i>
+                    </button>
+
+                    <button
+                        type="button"
+                        data-cmd="underline"
+                        title="Underline (Ctrl+U)"
+                        aria-pressed="false"
+                    >
+                        <u>U</u>
+                    </button>
+
+                    <button
+                        type="button"
+                        data-cmd="strikeThrough"
+                        title="Strikethrough (Ctrl+Shift+X)"
+                        aria-pressed="false"
+                    >
+                        <s>S</s>
+                    </button>
+
+                    <button
+                        type="button"
+                        data-cmd="insertUnorderedList"
+                        title="Bullet list (Ctrl+Shift+8)"
+                        aria-pressed="false"
+                    >
+                        • List
+                    </button>
+
+                    <button
+                        type="button"
+                        data-cmd="insertOrderedList"
+                        title="Numbered list (Ctrl+Shift+7)"
+                        aria-pressed="false"
+                    >
+                        1. List
+                    </button>
+
+                    <button
+                        type="button"
+                        data-cmd="formatBlock"
+                        data-val="h3"
+                        title="Header (Ctrl+Alt+1)"
+                        aria-pressed="false"
+                    >
+                        H3
+                    </button>
+
+                    <button
+                        type="button"
+                        data-cmd="formatBlock"
+                        data-val="blockquote"
+                        title="Blockquote (Ctrl+Shift+&gt;)"
+                        aria-pressed="false"
+                    >
+                        ❝
+                    </button>
+
+                    <div class="sep"></div>
+
+                    <button
+                        type="button"
+                        data-cmd="inlineCode"
+                        title="Inline code (Ctrl+`)"
+                        aria-pressed="false"
+                    >
+                        &lt;/&gt;
+                    </button>
+
+                    <button
+                        type="button"
+                        data-cmd="codeBlock"
+                        title="Code block (Ctrl+Shift+`)"
+                        aria-pressed="false"
+                    >
+                        { }
+                    </button>
+
+                    <button
+                        type="button"
+                        data-cmd="link"
+                        title="Insert link (Ctrl+K)"
+                        aria-pressed="false"
+                    >
+                        🔗
+                    </button>
+
+                    <button
+                        type="button"
+                        data-cmd="removeFormat"
+                        title="Clear formatting (Ctrl+\)"
+                    >
+                        ✕
+                    </button>
+                </div>
+
+                <div
+                    id="editor"
+                    contenteditable="true"
+                    spellcheck="true"
+                    data-placeholder="Type or paste your journal entry here…"
+                ></div>
+            </div>
+
+            <div class="pane">
+                <div class="output-head">
+                    <span>ServiceNow journal output</span>
+                    <button type="button" id="copyBtn">Copy</button>
+                </div>
+
+                <pre id="output" readonly></pre>
+            </div>
+        </main>
+
+        <script src="app.js"></script>
+    </body>
+</html>
