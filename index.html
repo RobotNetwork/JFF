@@ -20,11 +20,17 @@
 
         <main>
             <div class="pane">
-                <div class="toolbar" id="toolbar">
+                <div
+                    class="toolbar"
+                    id="toolbar"
+                    role="toolbar"
+                    aria-label="Text formatting"
+                >
                     <button
                         type="button"
                         data-cmd="bold"
                         title="Bold (Ctrl+B)"
+                        aria-label="Bold"
                         aria-pressed="false"
                     >
                         <b>B</b>
@@ -34,6 +40,7 @@
                         type="button"
                         data-cmd="italic"
                         title="Italic (Ctrl+I)"
+                        aria-label="Italic"
                         aria-pressed="false"
                     >
                         <i>I</i>
@@ -43,6 +50,7 @@
                         type="button"
                         data-cmd="underline"
                         title="Underline (Ctrl+U)"
+                        aria-label="Underline"
                         aria-pressed="false"
                     >
                         <u>U</u>
@@ -52,6 +60,7 @@
                         type="button"
                         data-cmd="strikeThrough"
                         title="Strikethrough (Ctrl+Shift+X)"
+                        aria-label="Strikethrough"
                         aria-pressed="false"
                     >
                         <s>S</s>
@@ -61,6 +70,7 @@
                         type="button"
                         data-cmd="insertUnorderedList"
                         title="Bullet list (Ctrl+Shift+8)"
+                        aria-label="Bullet list"
                         aria-pressed="false"
                     >
                         • List
@@ -70,6 +80,7 @@
                         type="button"
                         data-cmd="insertOrderedList"
                         title="Numbered list (Ctrl+Shift+7)"
+                        aria-label="Numbered list"
                         aria-pressed="false"
                     >
                         1. List
@@ -80,6 +91,7 @@
                         data-cmd="formatBlock"
                         data-val="h3"
                         title="Header (Ctrl+Alt+1)"
+                        aria-label="Header"
                         aria-pressed="false"
                     >
                         H3
@@ -90,6 +102,7 @@
                         data-cmd="formatBlock"
                         data-val="blockquote"
                         title="Blockquote (Ctrl+Shift+&gt;)"
+                        aria-label="Blockquote"
                         aria-pressed="false"
                     >
                         ❝
@@ -101,6 +114,7 @@
                         type="button"
                         data-cmd="inlineCode"
                         title="Inline code (Ctrl+`)"
+                        aria-label="Inline code"
                         aria-pressed="false"
                     >
                         &lt;/&gt;
@@ -110,6 +124,7 @@
                         type="button"
                         data-cmd="codeBlock"
                         title="Code block (Ctrl+Shift+`)"
+                        aria-label="Code block"
                         aria-pressed="false"
                     >
                         { }
@@ -119,6 +134,7 @@
                         type="button"
                         data-cmd="link"
                         title="Insert link (Ctrl+K)"
+                        aria-label="Insert link"
                         aria-pressed="false"
                     >
                         🔗
@@ -128,6 +144,7 @@
                         type="button"
                         data-cmd="removeFormat"
                         title="Clear formatting (Ctrl+\)"
+                        aria-label="Clear formatting"
                     >
                         ✕
                     </button>
@@ -136,6 +153,10 @@
                 <div
                     id="editor"
                     contenteditable="true"
+                    role="textbox"
+                    aria-multiline="true"
+                    aria-label="Journal entry"
+                    aria-placeholder="Type or paste your journal entry here…"
                     spellcheck="true"
                     data-placeholder="Type or paste your journal entry here…"
                 ></div>
@@ -147,7 +168,11 @@
                     <button type="button" id="copyBtn">Copy</button>
                 </div>
 
-                <pre id="output" readonly></pre>
+                <pre
+                    id="output"
+                    aria-live="polite"
+                    aria-label="ServiceNow journal output"
+                ></pre>
             </div>
         </main>
 

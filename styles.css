@@ -1,7 +1,9 @@
 :root {
+    color-scheme: dark;
     --bg: #1e2126;
     --panel: #262a31;
     --border: #3a3f47;
+    --border-strong: #7a818c;
     --text: #e4e7eb;
     --accent: #62d84e;
     --muted: #9aa1ab;
@@ -21,6 +23,7 @@ body {
     background: var(--bg);
     color: var(--text);
     height: 100vh;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
 }
@@ -74,7 +77,7 @@ main {
 .toolbar button {
     min-width: 30px;
     padding: 4px 9px;
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-strong);
     border-radius: 4px;
     background: transparent;
     color: var(--text);
@@ -92,15 +95,13 @@ main {
     color: var(--accent);
 }
 
-.toolbar button.active,
 .toolbar button[aria-pressed="true"] {
     border-color: var(--accent);
     background: rgba(98, 216, 78, 0.18);
     color: var(--accent);
-    box-shadow: inset 0 0 0 1px rgba(98, 216, 78, 0.25);
+    box-shadow: inset 0 0 0 1px var(--accent);
 }
 
-.toolbar button.active:hover,
 .toolbar button[aria-pressed="true"]:hover {
     background: rgba(98, 216, 78, 0.25);
 }
@@ -144,6 +145,8 @@ main {
 
 #editor:focus {
     background: rgba(98, 216, 78, 0.02);
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
 }
 
 #editor blockquote {
@@ -207,6 +210,11 @@ main {
 .output-head button:hover {
     filter: brightness(1.1);
 }
+
+.output-head button.error {
+    background: #e5534b;
+    color: #fff;
+}
 #output {
     flex: 1;
     overflow-y: auto;
@@ -229,5 +237,9 @@ main {
     .pane {
         border-right: none;
         border-bottom: 1px solid var(--border);
+    }
+
+    .pane:last-child {
+        border-bottom: none;
     }
 }

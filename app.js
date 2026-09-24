@@ -5,59 +5,62 @@ const toolbar = document.getElementById("toolbar");
 
 /* ---------- Custom undo/redo history ---------- */
 
-let history = [];
-let historyIndex = -1;
-let historyTimer = null;
+const snapshotLimit = 100;
+const snapshotDebounce = 300;
+
+let undoStack = [];
+let undoIndex = -1;
+let undoTimer = null;
 
 function flushSnapshot() {
-    if (!historyTimer) return;
+    if (!undoTimer) return;
 
-    clearTimeout(historyTimer);
-    historyTimer = null;
+    clearTimeout(undoTimer);
+    undoTimer = null;
     commitSnapshot();
 }
 
 function commitSnapshot() {
     const html = editor.innerHTML;
 
-    if (history[historyIndex] && history[historyIndex].html === html) {
+    if (undoStack[undoIndex] && undoStack[undoIndex].html === html) {
         return;
     }
 
-    history = history.slice(0, historyIndex + 1);
-    history.push({ html, caret: captureCaret() });
+    undoStack = undoStack.slice(0, undoIndex + 1);
+    undoStack.push({ html, caret: captureCaret() });
 
-    if (history.length > 100) {
-        history.shift();
+    if (undoStack.length > snapshotLimit) {
+        undoStack.shift();
     }
 
-    historyIndex = history.length - 1;
+    undoIndex = undoStack.length - 1;
 }
 
 function queueSnapshot() {
-    clearTimeout(historyTimer);
+    clearTimeout(undoTimer);
 
-    historyTimer = setTimeout(() => {
-        historyTimer = null;
+    undoTimer = setTimeout(() => {
+        undoTimer = null;
         commitSnapshot();
-    }, 300);
+    }, snapshotDebounce);
 }
 
 /*
  * Steps are relative because a pending snapshot is committed first, which
- * appends an entry and moves historyIndex.
+ * appends an entry and moves undoIndex.
  */
 function restore(step) {
     flushSnapshot();
 
-    const index = historyIndex + step;
+    const index = undoIndex + step;
 
-    if (index < 0 || index >= history.length) return;
+    if (index < 0 || index >= undoStack.length) return;
 
-    historyIndex = index;
-    editor.innerHTML = history[index].html;
+    undoIndex = index;
+    editor.innerHTML = undoStack[index].html;
 
-    if (!applyCaret(history[index].caret)) {
+    if (!applyCaret(undoStack[index].caret)) {
         placeCaretAtEnd(editor);
     }
 
@@ -231,7 +234,34 @@ toolbar.addEventListener("mousedown", (event) => {
 
     if (!button) return;
 
+    /*
+     * Keeping the default would move focus out of the editor and collapse
+     * the selection the command needs, so a mouse press is handled here.
+     */
     event.preventDefault();
+    runToolbarCommand(button);
+});
+
+/*
+ * Enter or Space on a focused toolbar button raises a click with detail 0
+ * and never raises mousedown, so keyboard activation needs its own path. A
+ * real mouse click also raises click, with a non-zero detail, and is already
+ * handled above.
+ */
+toolbar.addEventListener("click", (event) => {
+    const button = event.target.closest("button");
+
+    if (!button || event.detail !== 0) return;
+
+    /*
+     * Keyboard activation moved focus to the button; the caret is restored
+     * to the editor so the command has something to act on.
+     */
+    editor.focus();
+    runToolbarCommand(button);
+});
+
+function runToolbarCommand(button) {
     flushSnapshot();
 
     const { cmd, val } = button.dataset;
@@ -243,7 +273,7 @@ toolbar.addEventListener("mousedown", (event) => {
     render();
 
     requestAnimationFrame(updateToolbarState);
-});
+}
 
 /*
  * Single entry point for the toolbar buttons and the keyboard shortcuts, so
@@ -273,6 +303,25 @@ function applyCommand(cmd, value) {
     }
 }
 
+/*
+ * The element that starts a line, for deciding whether a range stays inside
+ * one block. A range that crosses blocks would wrap the blocks themselves,
+ * which [code] cannot hold.
+ */
+const blockSelector =
+    "p, div, li, blockquote, pre, ul, ol, h1, h2, h3, h4, h5, h6";
+
+function blockOf(node) {
+    const element = closestElement(node);
+    const block = element ? element.closest(blockSelector) : null;
+
+    return block && editor.contains(block) ? block : editor;
+}
+
+function rangeCrossesBlocks(range) {
+    return blockOf(range.startContainer) !== blockOf(range.endContainer);
+}
+
 function wrapInlineCode() {
     const selection = window.getSelection();
 
@@ -281,6 +330,13 @@ function wrapInlineCode() {
     const range = selection.getRangeAt(0);
 
     if (!editor.contains(range.commonAncestorContainer)) return;
+
+    /*
+     * surroundContents throws when the range only partly covers an element,
+     * and the extract fallback would put block content inside the code span.
+     * A selection that crosses blocks is left alone instead.
+     */
+    if (rangeCrossesBlocks(range)) return;
 
     const code = document.createElement("code");
 
@@ -303,23 +359,30 @@ function insertLink() {
 
     if (!url) return;
 
+    /*
+     * The URL is validated before it reaches the DOM, so the editor never
+     * holds a link the serializer would have to reject anyway.
+     */
+    const href = normalizeHref(url);
+
+    if (!href) return;
+
     const selection = window.getSelection();
 
     if (!selection.rangeCount || selection.isCollapsed) {
-        const text = prompt("Link text:", url) || url;
+        const text = prompt("Link text:", href) || href;
 
         insertHtmlAtCursor(
-            `<a href="${escapeAttr(url)}">${escapeHtml(text)}</a>&nbsp;`,
+            `<a href="${escapeAttr(href)}">${escapeHtml(text)}</a>&nbsp;`,
         );
     } else {
-        document.execCommand("createLink", false, url);
+        document.execCommand("createLink", false, href);
     }
 }
 
 /* ---------- Toolbar active state ---------- */
 
 function setButtonActive(button, active) {
-    button.classList.toggle("active", active);
     button.setAttribute("aria-pressed", String(active));
 }
 
@@ -418,9 +481,13 @@ function markdownToHtml(markdown) {
          * Code spans and links are held as placeholders so the emphasis
          * passes cannot rewrite text inside them, and so link URLs are
          * escaped exactly once. Emphasis delimiters are anchored to word
-         * boundaries so that prose containing bare asterisks survives.
+         * boundaries so that prose containing bare asterisks survives. NUL
+         * is the placeholder delimiter, so any that arrived in the text is
+         * removed before tokenizing, and an index that does not resolve
+         * falls back to the literal match rather than to undefined.
          */
         const held = text
+            .replace(/\u0000/g, "")
             .replace(
                 /`([^`]+)`/g,
                 (_, code) => hold(`<code>${escapeHtml(code)}</code>`),
@@ -452,7 +519,7 @@ function markdownToHtml(markdown) {
             .replace(/~~([^~]+)~~/g, "<strike>$1</strike>")
             .replace(
                 /\u0000(\d+)\u0000/g,
-                (_, index) => tokens[Number(index)],
+                (match, index) => tokens[Number(index)] ?? match,
             );
     };
 
@@ -990,6 +1057,38 @@ function sanitizeRichText(doc) {
     });
 }
 
+/*
+ * Clipboard fragments can hold <li> elements with no list around them, which
+ * the serializer would otherwise flatten into one line. Every run of adjacent
+ * loose items is wrapped in an unordered list so the editor DOM is well
+ * formed before editing begins.
+ */
+function wrapOrphanListItems(root) {
+    for (const parent of [root, ...root.querySelectorAll("*")]) {
+        const tag = parent.tagName;
+
+        if (tag === "UL" || tag === "OL") continue;
+
+        let list = null;
+
+        for (const child of [...parent.childNodes]) {
+            if (
+                child.nodeType === Node.ELEMENT_NODE &&
+                child.tagName === "LI"
+            ) {
+                if (!list) {
+                    list = root.ownerDocument.createElement("ul");
+                    parent.insertBefore(list, child);
+                }
+
+                list.appendChild(child);
+            } else if (child.nodeType === Node.ELEMENT_NODE) {
+                list = null;
+            }
+        }
+    }
+}
+
 /* ---------- Keyboard shortcuts ---------- */
 
 /*
@@ -1013,7 +1112,7 @@ const editingShortcuts = [
     { code: "Backquote", cmd: "inlineCode" },
     { code: "Backquote", shift: true, cmd: "codeBlock" },
     { code: "Backslash", cmd: "removeFormat" },
-    { key: "1", alt: true, cmd: "formatBlock", val: "h3" },
+    { code: "Digit1", alt: true, cmd: "formatBlock", val: "h3" },
     { key: "z", cmd: "undo" },
     { key: "y", cmd: "redo" },
     { key: "z", shift: true, cmd: "redo" },
@@ -1035,6 +1134,23 @@ editor.addEventListener("keydown", (event) => {
     const mod = event.ctrlKey || event.metaKey;
 
     if (event.key === "Tab") {
+        const selection = window.getSelection();
+        const anchor = selection.rangeCount
+            ? closestElement(selection.anchorNode)
+            : null;
+        const handled =
+            anchor &&
+            editor.contains(anchor) &&
+            (anchor.closest("li") || anchor.closest("pre"));
+
+        /*
+         * Tab is only captured where it does something: nesting a list item
+         * or indenting a code block. Everywhere else it keeps its default,
+         * so it moves focus out of the editor instead of trapping it (WCAG
+         * 2.1.2).
+         */
+        if (!handled) return;
+
         event.preventDefault();
         flushSnapshot();
         handleTab(event.shiftKey);
@@ -1048,37 +1164,50 @@ editor.addEventListener("keydown", (event) => {
         const selection = window.getSelection();
 
         if (selection.rangeCount && selection.isCollapsed) {
-            const element = closestElement(selection.anchorNode);
-            const pre = element?.closest("pre");
+            const range = selection.getRangeAt(0);
+            const element = closestElement(range.startContainer);
+            const pre = element ? element.closest("pre") : null;
 
             if (pre) {
-                const range = selection.getRangeAt(0);
-                const after = range.cloneRange();
+                /*
+                 * Range.toString() ignores <br>, and Enter inside a pre
+                 * produces <br>, so the line the caret sits on has to be read
+                 * from the DOM instead.
+                 */
+                const before = document.createRange();
+
+                before.selectNodeContents(pre);
+                before.setEnd(range.startContainer, range.startOffset);
+
+                const after = document.createRange();
 
                 after.selectNodeContents(pre);
                 after.setStart(range.endContainer, range.endOffset);
 
-                const before = range.cloneRange();
-
-                before.selectNodeContents(pre);
-                before.setEnd(
-                    range.startContainer,
-                    range.startOffset,
-                );
-
-                const caretAtEnd = after.toString() === "";
+                const afterFragment = after.cloneContents();
+                const caretAtEnd =
+                    codeText(afterFragment).replace(/\n/g, "").trim() ===
+                        "" && !afterFragment.querySelector("*:not(br)");
                 const currentLineEmpty = /(^|\n)$/.test(
-                    before.toString(),
+                    codeText(before.cloneContents()),
                 );
 
                 if (caretAtEnd && currentLineEmpty) {
                     event.preventDefault();
                     flushSnapshot();
 
-                    pre.textContent = pre.textContent.replace(
-                        /\n$/,
-                        "",
-                    );
+                    /*
+                     * The empty final line that triggered the exit goes with
+                     * it, whether it was a <br> or a lone newline.
+                     */
+                    if (pre.lastChild && pre.lastChild.nodeName === "BR") {
+                        pre.lastChild.remove();
+                    } else {
+                        pre.textContent = pre.textContent.replace(
+                            /\n$/,
+                            "",
+                        );
+                    }
 
                     const paragraph = document.createElement("p");
 
@@ -1216,10 +1345,16 @@ function nestListItem(item) {
     return preservingSelection(item, () => {
         const list = item.parentElement;
         const previous = item.previousElementSibling;
+        const tag = list ? list.tagName.toLowerCase() : "";
 
         if (!list || !previous || previous.tagName !== "LI") return false;
 
-        const tag = list.tagName.toLowerCase();
+        /*
+         * A bare <li> sits directly in the editor, whose tag is not a list,
+         * so nesting it would build a stray <div> wrapper.
+         */
+        if (tag !== "ul" && tag !== "ol") return false;
+
         let sublist = previous.lastElementChild;
 
         if (!sublist || sublist.tagName.toLowerCase() !== tag) {
@@ -1443,13 +1578,31 @@ function handleTab(shiftKey) {
      * item above it the previous sibling of the next one.
      */
     const order = shiftKey ? [...items].reverse() : items;
+    let moved = false;
 
     for (const item of order) {
-        if (shiftKey) {
-            outdentListItem(item);
-        } else {
-            nestListItem(item);
-        }
+        const changed = shiftKey
+            ? outdentListItem(item)
+            : nestListItem(item);
+
+        if (changed) moved = true;
+    }
+
+    /*
+     * Each move restores the caret to the item it moved, which collapses a
+     * multi-item selection onto the last one. Rebuilding the range over every
+     * item keeps the next Tab acting on all of them.
+     */
+    if (moved && items.length > 1) {
+        const range = document.createRange();
+
+        range.setStartBefore(items[0]);
+        range.setEndAfter(items[items.length - 1]);
+
+        const selection = window.getSelection();
+
+        selection.removeAllRanges();
+        selection.addRange(range);
     }
 }
 
@@ -1524,10 +1677,18 @@ function wrapCode(html) {
 function normalizeHref(value) {
     const href = value.trim();
 
+    if (/^(https?:|mailto:|tel:)/i.test(href)) return href;
+
+    if (href.startsWith("#")) return href;
+
+    /*
+     * A single leading slash is a same-site path. Two of them, or a slash
+     * followed by a backslash, is resolved off-host by the browser.
+     */
     if (
-        /^(https?:|mailto:|tel:)/i.test(href) ||
-        href.startsWith("/") ||
-        href.startsWith("#")
+        href.startsWith("/") &&
+        !href.startsWith("//") &&
+        !href.startsWith("/\\")
     ) {
         return href;
     }
@@ -1564,20 +1725,67 @@ function normalizeCodePunctuation(text) {
 function serializeText(node, insideCode) {
     const text = node.textContent.replace(/\u00a0/g, " ");
 
+    if (insideCode) {
+        /*
+         * Inside [code] ServiceNow renders HTML, so literal characters must
+         * be escaped.
+         */
+        return escapeHtml(normalizeCodePunctuation(text));
+    }
+
     /*
-     * Inside [code] ServiceNow renders HTML, so literal characters must be
-     * escaped. Outside it the journal shows the text as written, so escaping
-     * there would display entities instead of the characters typed.
+     * Outside [code] the journal shows the text as written, so escaping
+     * there would display entities instead of the characters typed. A
+     * delimiter written as literal prose would still mint a live region
+     * downstream, though, so a zero-width space after the bracket breaks it
+     * for the renderer while staying invisible. This runs in the prose
+     * branch only: the regions the app builds are minted later by wrapCode
+     * and are left untouched.
      */
-    return insideCode
-        ? escapeHtml(normalizeCodePunctuation(text))
-        : text;
+    return text.replace(/\[(\/?code)\]/gi, "[\u200b$1]");
 }
 
+/*
+ * A paragraph-like block inside [code]: its own end supplies the line break,
+ * so no separator is needed between blocks of another kind.
+ */
+function isParagraphBlock(node) {
+    if (node.nodeType !== Node.ELEMENT_NODE) return false;
+
+    const tag = node.tagName.toLowerCase();
+
+    return tag === "p" || tag === "div";
+}
+
+/*
+ * Inside [code] line structure is explicit: ServiceNow strips newlines and
+ * <br>, so a paragraph is separated from its siblings by an empty <p></p>
+ * rather than by a newline. Outside [code] the newline each block appends is
+ * the break, and no separator is inserted.
+ */
 function serializeChildren(node, insideCode) {
-    return [...node.childNodes]
-        .map((child) => serializeNode(child, insideCode))
-        .join("");
+    let html = "";
+    let previous = null;
+
+    for (const child of node.childNodes) {
+        const part = serializeNode(child, insideCode);
+
+        if (
+            insideCode &&
+            previous &&
+            part !== "" &&
+            !html.endsWith("<p></p>") &&
+            (isParagraphBlock(previous) || isParagraphBlock(child))
+        ) {
+            html += "<p></p>";
+        }
+
+        html += part;
+
+        if (part !== "") previous = child;
+    }
+
+    return html;
 }
 
 function codeText(element) {
@@ -1611,6 +1819,21 @@ function codeText(element) {
 
 function serializeHtmlElement(element) {
     const tag = element.tagName.toLowerCase();
+
+    if (tag === "pre") {
+        /*
+         * codeText descends through a <code> child and over <br> and block
+         * children, so a pre keeps every sibling of its code child instead
+         * of dropping all but the first. Computing it here also avoids a
+         * full child walk that the switch would otherwise discard.
+         */
+        const text = normalizeCodePunctuation(
+            codeText(element).replace(/^\n+|\n+$/g, ""),
+        );
+
+        return `<pre><code>${escapeHtml(text)}</code></pre>`;
+    }
+
     const inner = serializeChildren(element, true);
 
     switch (tag) {
@@ -1634,15 +1857,6 @@ function serializeHtmlElement(element) {
         case "code":
             // Intentionally bold inline code for ServiceNow readability.
             return `<b><code>${inner}</code></b>`;
-
-        case "pre": {
-            const body = element.querySelector(":scope > code") || element;
-            const text = normalizeCodePunctuation(
-                codeText(body).replace(/^\n+|\n+$/g, ""),
-            );
-
-            return `<pre><code>${escapeHtml(text)}</code></pre>`;
-        }
 
         case "blockquote":
             return `<blockquote>${inner}</blockquote>`;
@@ -1706,6 +1920,23 @@ function serializeNode(node, insideCode = false) {
     }
 
     if (tag === "p" || tag === "div") {
+        const content = serializeChildren(node, false);
+
+        if (!content) return "\n";
+
+        /*
+         * A block that already ends with a child's newline - a list or a
+         * blockquote wrapped in a paragraph - must not add a second one,
+         * which would show up as a blank line before whatever follows.
+         */
+        return content.endsWith("\n") ? content : `${content}\n`;
+    }
+
+    /*
+     * A list item outside a list carries its own line, so a fragment of bare
+     * <li> elements does not serialize as one joined line.
+     */
+    if (tag === "li") {
         const content = serializeChildren(node, false);
 
         return content ? `${content}\n` : "\n";
@@ -1784,11 +2015,20 @@ editor.addEventListener("paste", (event) => {
 
         sanitizeRichText(doc);
 
+        wrapOrphanListItems(doc.body);
+
         normalizeRichTextWhitespace(doc.body);
 
-        insertHtmlAtCursor(doc.body.innerHTML);
-        normalizeCodeBlocks(editor);
-        return;
+        /*
+         * Clipboard HTML can carry structure but no content - a lone <meta>
+         * tag, or an image the sanitizer drops - so an empty body falls
+         * through to the text/plain branch instead of pasting nothing.
+         */
+        if (doc.body.textContent.trim() !== "") {
+            insertHtmlAtCursor(doc.body.innerHTML);
+            normalizeCodeBlocks(editor);
+            return;
+        }
     }
 
     const text = clipboard.getData("text/plain");
@@ -1819,13 +2059,57 @@ function escapeAttr(value) {
     return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 }
 
+/*
+ * A line that carries code rather than prose: punctuation that only appears
+ * in code, a language keyword, a call, an assignment, or indentation.
+ */
+const codeShapes = [
+    /[;{}]|=>|==|!=|:=|<=|>=/,
+    /\b(?:def|function|class|return|import|from|const|let|var|public|private|protected|static|void|int|float|double|bool|string|true|false|null|nil|print|printf|echo|console|require|await|async|SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|JOIN|GROUP|ORDER)\b/i,
+    /[A-Za-z_$][\w$]*\s*\(/,
+    /\w\s*[=<>!]=?\s*\S/,
+    /^\s+\S/,
+];
+
+const codeComments = /^\s*(?:#|\/\/|--|;|%)/;
+
+/*
+ * A plain-text paste that is really a code sample should not be run through
+ * the markdown parser, whatever its comment lines look like. It counts as
+ * code when there are at least two lines and every non-empty line is either
+ * a comment or one of the shapes above, with at least one shape rather than
+ * only comments.
+ */
+function looksLikeCode(text) {
+    const lines = text.split(/\r?\n/).filter((line) => line.trim() !== "");
+
+    if (lines.length < 2) return false;
+
+    let definite = false;
+
+    for (const line of lines) {
+        if (codeComments.test(line)) continue;
+
+        if (!codeShapes.some((pattern) => pattern.test(line))) {
+            return false;
+        }
+
+        definite = true;
+    }
+
+    return definite;
+}
+
 function looksLikeMarkdown(text) {
-    return (
-        /^(#{1,6}\s|[-*+]\s|\d+[.)]\s|>\s|```)/m.test(text) ||
-        /(\*\*[^*]+\*\*|`[^`]+`|~~[^~]+~~|\[[^\]]+\]\([^)]+\))/.test(
-            text,
-        )
-    );
+    const blockMarker = /^(#{1,6}\s|[-*+]\s|\d+[.)]\s|>\s|```)/m;
+    const inlineMarker =
+        /(\*\*[^*]+\*\*|`[^`]+`|~~[^~]+~~|\[[^\]]+\]\([^)]+\))/;
+
+    if (!blockMarker.test(text) && !inlineMarker.test(text)) {
+        return false;
+    }
+
+    return !looksLikeCode(text);
 }
 
 /* ---------- Events ---------- */
@@ -1853,14 +2137,73 @@ document.addEventListener("selectionchange", () => {
     requestAnimationFrame(updateToolbarState);
 });
 
-copyBtn.addEventListener("click", async () => {
-    await navigator.clipboard.writeText(output.textContent);
+const copyLabelDelay = 1200;
 
-    copyBtn.textContent = "Copied!";
+let copyLabelTimer = null;
 
-    setTimeout(() => {
+function flashCopyLabel(text, failed) {
+    /*
+     * A stored handle means a second click cannot be cut short by the first
+     * click's timer resetting the label.
+     */
+    clearTimeout(copyLabelTimer);
+
+    copyBtn.textContent = text;
+    copyBtn.classList.toggle("error", Boolean(failed));
+
+    copyLabelTimer = setTimeout(() => {
+        copyLabelTimer = null;
         copyBtn.textContent = "Copy";
-    }, 1200);
+        copyBtn.classList.remove("error");
+    }, copyLabelDelay);
+}
+
+/*
+ * The legacy command is the fallback for navigator.clipboard being undefined
+ * on a non-secure origin, and for a rejected write. It works from a temporary
+ * selection, since the output pane is not selectable for this purpose.
+ */
+function copyViaExecCommand(text) {
+    const area = document.createElement("textarea");
+
+    area.value = text;
+    area.setAttribute("readonly", "true");
+    area.style.position = "fixed";
+    area.style.top = "-1000px";
+
+    document.body.appendChild(area);
+    area.select();
+
+    let copied = false;
+
+    try {
+        copied = document.execCommand("copy");
+    } catch {
+        copied = false;
+    }
+
+    area.remove();
+
+    return copied;
+}
+
+copyBtn.addEventListener("click", async () => {
+    const text = output.textContent;
+
+    let copied = false;
+
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+            copied = true;
+        }
+    } catch {
+        copied = false;
+    }
+
+    if (!copied) copied = copyViaExecCommand(text);
+
+    flashCopyLabel(copied ? "Copied!" : "Copy failed", !copied);
 });
 
 /*
