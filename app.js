@@ -2,6 +2,8 @@ const editor = document.getElementById("editor");
 const output = document.getElementById("output");
 const copyBtn = document.getElementById("copyBtn");
 const toolbar = document.getElementById("toolbar");
+const headingToggle = document.getElementById("headingToggle");
+const headingMenu = document.getElementById("headingMenu");
 
 /* ---------- Custom undo/redo history ---------- */
 
@@ -230,7 +232,17 @@ function insertHtmlAtCursor(html) {
 /* ---------- Toolbar ---------- */
 
 toolbar.addEventListener("mousedown", (event) => {
-    const button = event.target.closest("button");
+    if (event.target.closest(".dropdown-toggle")) {
+        /*
+         * The press is kept from moving focus so the editor selection
+         * survives, and the menu opens without stealing it.
+         */
+        event.preventDefault();
+        setHeadingMenuOpen(headingMenu.hidden);
+        return;
+    }
+
+    const button = event.target.closest("button[data-cmd]");
 
     if (!button) return;
 
@@ -240,6 +252,9 @@ toolbar.addEventListener("mousedown", (event) => {
      */
     event.preventDefault();
     runToolbarCommand(button);
+
+    /* A menu choice has been made, so the menu closes with it. */
+    if (button.closest(".dropdown-menu")) closeHeadingMenu();
 });
 
 /*
@@ -249,7 +264,18 @@ toolbar.addEventListener("mousedown", (event) => {
  * handled above.
  */
 toolbar.addEventListener("click", (event) => {
-    const button = event.target.closest("button");
+    if (event.target.closest(".dropdown-toggle")) {
+        if (event.detail !== 0) return;
+
+        /*
+         * Keyboard activation opens the menu onto the item in use, so an
+         * arrow key or a second Enter acts on it immediately.
+         */
+        setHeadingMenuOpen(headingMenu.hidden, true);
+        return;
+    }
+
+    const button = event.target.closest("button[data-cmd]");
 
     if (!button || event.detail !== 0) return;
 
@@ -259,6 +285,8 @@ toolbar.addEventListener("click", (event) => {
      */
     editor.focus();
     runToolbarCommand(button);
+
+    if (button.closest(".dropdown-menu")) closeHeadingMenu();
 });
 
 function runToolbarCommand(button) {
@@ -396,6 +424,9 @@ function updateToolbarState() {
     const selectedElement = getSelectedElement();
 
     for (const button of toolbar.querySelectorAll("button")) {
+        /* The heading control is a switch over levels, not an inline toggle. */
+        if (button.closest(".dropdown")) continue;
+
         const { cmd, val } = button.dataset;
 
         if (!cmd || cmd === "removeFormat") continue;
@@ -447,7 +478,106 @@ function updateToolbarState() {
 
         setButtonActive(button, active);
     }
+
+    /*
+     * The heading label and the menu check mark follow the block at the
+     * caret. Skipped while the menu is open, when focus sits on a menu item
+     * and the selection would read as no heading at all.
+     */
+    if (headingMenu.hidden) updateHeadingControl();
 }
+
+/* ---------- Heading dropdown ---------- */
+
+/*
+ * One button in place of six. Its label carries the level the caret is on
+ * and the menu marks the same item, so the control always shows what is in
+ * use without spending a button per level.
+ */
+function headingLevelInUse() {
+    const element = getSelectedElement();
+    const heading = element
+        ? element.closest("h1, h2, h3, h4, h5, h6")
+        : null;
+
+    return heading && editor.contains(heading)
+        ? heading.tagName.toLowerCase()
+        : "";
+}
+
+function updateHeadingControl() {
+    const level = headingLevelInUse();
+
+    headingToggle.textContent = level ? level.toUpperCase() : "Heading";
+    headingToggle.classList.toggle("is-active", Boolean(level));
+
+    for (const item of headingMenu.querySelectorAll("button[data-val]")) {
+        item.setAttribute(
+            "aria-checked",
+            String(item.dataset.val === level),
+        );
+    }
+}
+
+function setHeadingMenuOpen(open, focusItem = false) {
+    headingMenu.hidden = !open;
+    headingToggle.setAttribute("aria-expanded", String(open));
+
+    if (open && focusItem) {
+        const checked = headingMenu.querySelector('[aria-checked="true"]');
+        const target = checked ?? headingMenu.firstElementChild;
+
+        if (target) target.focus();
+    }
+}
+
+function closeHeadingMenu() {
+    if (headingMenu.hidden) return;
+
+    setHeadingMenuOpen(false);
+}
+
+/*
+ * A menu is a list of choices rather than a tab stop, so the arrows move
+ * between them and Escape returns to the toggle. Tab closes and moves on.
+ */
+headingMenu.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+        event.preventDefault();
+        closeHeadingMenu();
+        headingToggle.focus();
+        return;
+    }
+
+    if (event.key === "Tab") {
+        closeHeadingMenu();
+        return;
+    }
+
+    const step =
+        event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
+
+    if (!step) return;
+
+    event.preventDefault();
+
+    const items = [...headingMenu.querySelectorAll("button[data-val]")];
+    const index = items.indexOf(document.activeElement);
+    const next = items[(index + step + items.length) % items.length];
+
+    next.focus();
+});
+
+/*
+ * A press anywhere outside the control dismisses the menu. The toolbar
+ * listener runs first and keeps the editor selection for its own commands,
+ * so this only ever closes an open menu.
+ */
+document.addEventListener("mousedown", (event) => {
+    if (!headingMenu.hidden && !event.target.closest(".dropdown")) {
+        closeHeadingMenu();
+    }
+});
 
 /* ---------- Markdown to HTML ---------- */
 
@@ -544,12 +674,16 @@ function markdownToHtml(markdown) {
         if (/^\s*```[\w-]*\s*$/.test(line)) {
             closeList();
             fence = [];
-        } else if ((match = line.match(/^#{1,3}\s+(.*)$/))) {
+        } else if ((match = line.match(/^(#{1,6})\s+(.*)$/))) {
+            /*
+             * ServiceNow renders each heading level as written, so the hash
+             * count maps straight to the tag rather than collapsing to h3.
+             */
             closeList();
-            result.push(`<h3>${inline(match[1])}</h3>`);
-        } else if ((match = line.match(/^#{4,6}\s+(.*)$/))) {
-            closeList();
-            result.push(`<p><b>${inline(match[1])}</b></p>`);
+
+            const level = match[1].length;
+
+            result.push(`<h${level}>${inline(match[2])}</h${level}>`);
         } else if ((match = line.match(/^>\s?(.*)$/))) {
             closeList();
             result.push(
@@ -1112,7 +1246,12 @@ const editingShortcuts = [
     { code: "Backquote", cmd: "inlineCode" },
     { code: "Backquote", shift: true, cmd: "codeBlock" },
     { code: "Backslash", cmd: "removeFormat" },
-    { code: "Digit1", alt: true, cmd: "formatBlock", val: "h3" },
+    { code: "Digit1", alt: true, cmd: "formatBlock", val: "h1" },
+    { code: "Digit2", alt: true, cmd: "formatBlock", val: "h2" },
+    { code: "Digit3", alt: true, cmd: "formatBlock", val: "h3" },
+    { code: "Digit4", alt: true, cmd: "formatBlock", val: "h4" },
+    { code: "Digit5", alt: true, cmd: "formatBlock", val: "h5" },
+    { code: "Digit6", alt: true, cmd: "formatBlock", val: "h6" },
     { key: "z", cmd: "undo" },
     { key: "y", cmd: "redo" },
     { key: "z", shift: true, cmd: "redo" },
@@ -1881,12 +2020,14 @@ function serializeHtmlElement(element) {
         case "h1":
         case "h2":
         case "h3":
-            return `<h3>${inner}</h3>`;
-
         case "h4":
         case "h5":
         case "h6":
-            return `<b>${inner}</b>`;
+            /*
+             * ServiceNow keeps the level it is given, so an h1 stays an h1
+             * instead of being rewritten to h3 or demoted to bold.
+             */
+            return `<${tag}>${inner}</${tag}>`;
 
         case "br":
             /*

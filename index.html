@@ -86,16 +86,99 @@
                         1. List
                     </button>
 
-                    <button
-                        type="button"
-                        data-cmd="formatBlock"
-                        data-val="h3"
-                        title="Header (Ctrl+Alt+1)"
-                        aria-label="Header"
-                        aria-pressed="false"
-                    >
-                        H3
-                    </button>
+                    <div class="dropdown" id="headingDropdown">
+                        <button
+                            type="button"
+                            class="dropdown-toggle"
+                            id="headingToggle"
+                            aria-haspopup="menu"
+                            aria-expanded="false"
+                            aria-label="Heading level"
+                            title="Heading (Ctrl+Alt+1-6)"
+                        >
+                            Heading
+                        </button>
+
+                        <div
+                            class="dropdown-menu"
+                            id="headingMenu"
+                            role="menu"
+                            aria-labelledby="headingToggle"
+                            hidden
+                        >
+                            <button
+                                type="button"
+                                role="menuitemradio"
+                                aria-checked="false"
+                                aria-label="Heading 1"
+                                data-cmd="formatBlock"
+                                data-val="h1"
+                                title="Heading 1 (Ctrl+Alt+1)"
+                            >
+                                H1
+                            </button>
+
+                            <button
+                                type="button"
+                                role="menuitemradio"
+                                aria-checked="false"
+                                aria-label="Heading 2"
+                                data-cmd="formatBlock"
+                                data-val="h2"
+                                title="Heading 2 (Ctrl+Alt+2)"
+                            >
+                                H2
+                            </button>
+
+                            <button
+                                type="button"
+                                role="menuitemradio"
+                                aria-checked="false"
+                                aria-label="Heading 3"
+                                data-cmd="formatBlock"
+                                data-val="h3"
+                                title="Heading 3 (Ctrl+Alt+3)"
+                            >
+                                H3
+                            </button>
+
+                            <button
+                                type="button"
+                                role="menuitemradio"
+                                aria-checked="false"
+                                aria-label="Heading 4"
+                                data-cmd="formatBlock"
+                                data-val="h4"
+                                title="Heading 4 (Ctrl+Alt+4)"
+                            >
+                                H4
+                            </button>
+
+                            <button
+                                type="button"
+                                role="menuitemradio"
+                                aria-checked="false"
+                                aria-label="Heading 5"
+                                data-cmd="formatBlock"
+                                data-val="h5"
+                                title="Heading 5 (Ctrl+Alt+5)"
+                            >
+                                H5
+                            </button>
+
+                            <button
+                                type="button"
+                                role="menuitemradio"
+                                aria-checked="false"
+                                aria-label="Heading 6"
+                                data-cmd="formatBlock"
+                                data-val="h6"
+                                title="Heading 6 (Ctrl+Alt+6)"
+                            >
+                                H6
+                            </button>
+                        </div>
+                    </div>
 
                     <button
                         type="button"
