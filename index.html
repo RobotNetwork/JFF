@@ -16,6 +16,26 @@
         <header>
             <h1>Journal Entry Formatter</h1>
             <span>Rich text → ServiceNow journal [code] markup</span>
+
+            <div class="header-actions">
+                <button
+                    type="button"
+                    id="clearBtn"
+                    title="Clear the entry and start again"
+                >
+                    Clear entry
+                </button>
+
+                <button
+                    type="button"
+                    id="shortcutBtn"
+                    aria-label="Keyboard shortcuts"
+                    aria-haspopup="dialog"
+                    title="Keyboard shortcuts"
+                >
+                    ?
+                </button>
+            </div>
         </header>
 
         <main>
@@ -248,11 +268,12 @@
             <div class="pane">
                 <div class="output-head">
                     <span>ServiceNow journal output</span>
-                    <button type="button" id="copyBtn">Copy</button>
+                    <button type="button" id="copyBtn" disabled>Copy</button>
                 </div>
 
                 <pre
                     id="output"
+                    data-empty="Markup appears here as you type."
                     aria-live="polite"
                     aria-label="ServiceNow journal output"
                 ></pre>
@@ -292,11 +313,37 @@
                     />
                 </div>
 
-                <div class="link-actions">
+                <div class="dialog-actions">
                     <button type="button" id="linkCancel">Cancel</button>
                     <button type="submit" class="primary">Insert</button>
                 </div>
             </form>
+        </dialog>
+
+        <dialog
+            id="shortcutsDialog"
+            class="shortcut-dialog"
+            aria-labelledby="shortcutsTitle"
+        >
+            <div class="shortcut-form">
+                <h2 id="shortcutsTitle">Keyboard shortcuts</h2>
+
+                <ul class="shortcut-list" id="shortcutList" role="list"></ul>
+
+                <p class="shortcut-note">
+                    Ctrl on Windows and Linux, Cmd on macOS.
+                </p>
+
+                <div class="dialog-actions">
+                    <button
+                        type="button"
+                        id="shortcutsClose"
+                        class="primary"
+                    >
+                        Close
+                    </button>
+                </div>
+            </div>
         </dialog>
 
         <script src="app.js"></script>

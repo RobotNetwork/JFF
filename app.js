@@ -11,6 +11,11 @@ const linkText = document.getElementById("linkText");
 const linkTextRow = document.getElementById("linkTextRow");
 const linkError = document.getElementById("linkError");
 const linkCancel = document.getElementById("linkCancel");
+const clearBtn = document.getElementById("clearBtn");
+const shortcutBtn = document.getElementById("shortcutBtn");
+const shortcutsDialog = document.getElementById("shortcutsDialog");
+const shortcutList = document.getElementById("shortcutList");
+const shortcutsClose = document.getElementById("shortcutsClose");
 
 /* ---------- Custom undo/redo history ---------- */
 
@@ -529,6 +534,101 @@ linkDialog.addEventListener("close", () => {
     queueSnapshot();
     render();
     updateToolbarState();
+});
+
+/* ---------- Shortcut reference ---------- */
+
+/*
+ * The reference is built from editingShortcuts, so a chord recorded there
+ * appears here without a second edit, and the name comes from the toolbar
+ * button that runs the same command, so a command has one name.
+ */
+const extraShortcuts = [
+    {
+        keys: "Tab",
+        label: "Indent a list item, or a tab inside a code block",
+    },
+    { keys: "Shift+Tab", label: "Outdent a list item, or clear one indent" },
+    {
+        keys: "Enter",
+        label: "Next list item, or leave a code block on an empty line",
+    },
+];
+
+const shortcutLabels = { undo: "Undo", redo: "Redo" };
+
+/* A code names the physical key, which is not the character it produces. */
+const chordKeys = {
+    Digit1: "1",
+    Digit2: "2",
+    Digit3: "3",
+    Digit4: "4",
+    Digit5: "5",
+    Digit6: "6",
+    Digit7: "7",
+    Digit8: "8",
+    Backquote: "`",
+    Backslash: "\\",
+    Period: ">",
+};
+
+function shortcutName(shortcut) {
+    const selector = shortcut.val
+        ? `button[data-cmd="${shortcut.cmd}"][data-val="${shortcut.val}"]`
+        : `button[data-cmd="${shortcut.cmd}"]:not([data-val])`;
+    const button = toolbar.querySelector(selector);
+
+    return (
+        (button && button.getAttribute("aria-label")) ||
+        shortcutLabels[shortcut.cmd] ||
+        shortcut.cmd
+    );
+}
+
+function chordLabel(shortcut) {
+    const parts = ["Ctrl"];
+
+    if (shortcut.shift) parts.push("Shift");
+    if (shortcut.alt) parts.push("Alt");
+
+    parts.push(
+        shortcut.code
+            ? chordKeys[shortcut.code] || shortcut.code
+            : shortcut.key.toUpperCase(),
+    );
+
+    return parts.join("+");
+}
+
+function buildShortcutList() {
+    const rows = [
+        ...editingShortcuts.map((shortcut) => [
+            chordLabel(shortcut),
+            shortcutName(shortcut),
+        ]),
+        ...extraShortcuts.map(({ keys, label }) => [keys, label]),
+    ];
+
+    for (const [keys, label] of rows) {
+        const item = document.createElement("li");
+        const chord = document.createElement("span");
+        const name = document.createElement("span");
+
+        chord.className = "shortcut-keys";
+        chord.textContent = keys;
+        name.textContent = label;
+
+        item.append(chord, name);
+        shortcutList.append(item);
+    }
+}
+
+shortcutBtn.addEventListener("click", () => {
+    shortcutsDialog.showModal();
+});
+
+shortcutsClose.addEventListener("click", () => {
+    shortcutsDialog.close();
 });
 
 /* ---------- Toolbar active state ---------- */
@@ -1524,6 +1624,14 @@ editor.addEventListener("keydown", (event) => {
 const listMarkerPattern = /^[ \t\u00a0]*(?:[-*+]|\d+[.)]) $/;
 
 /*
+ * The other two markers an editor recognises. They are anchored to the line
+ * with no leading whitespace: indentation is the nesting signal for a list,
+ * but a heading or a quote indented by accident stays text.
+ */
+const headingMarkerPattern = /^(#{1,6}) $/;
+const quoteMarkerPattern = /^> $/;
+
+/*
  * The block the caret belongs to: the list item holding it, or the element
  * that starts a line in the editor.
  */
@@ -1729,14 +1837,16 @@ function caretLine(block, range) {
 }
 
 /*
- * Typing a marker at the start of a line turns that line into a list item,
- * the way a word processor does. An indented marker nests the item one level
- * under the item above it.
+ * Typing a marker at the start of a line turns that line into the block it
+ * names, the way a word processor does. Bullets and numbers build a list item,
+ * a run of hashes builds a heading of that level, and a ">" builds a
+ * blockquote. These are the markers the paste parser reads, so a marker that
+ * works in pasted markdown works when it is typed.
  *
  * The list is built here rather than with execCommand, which Chrome ignores
  * for the length of the input event this runs in.
  */
-function applyListMarker() {
+function applyTypedMarker() {
     const selection = window.getSelection();
 
     if (!selection.rangeCount || !selection.isCollapsed) return false;
@@ -1744,38 +1854,41 @@ function applyListMarker() {
     const range = selection.getRangeAt(0);
     const block = caretBlock(range.startContainer);
 
+    /* A marker inside code is code, not markup. */
     if (!block || block.closest("pre")) return false;
 
     const prefix = textBefore(block, range);
+    const heading = prefix.match(headingMarkerPattern);
+    const quote = quoteMarkerPattern.test(prefix);
 
-    if (!listMarkerPattern.test(prefix)) return false;
+    if (!heading && !quote && !listMarkerPattern.test(prefix)) return false;
 
     const line = caretLine(block, range);
 
     // The editor is not a line, and replacing it would take the page apart.
     if (!line || line === editor) return false;
 
+    const blockMarker = Boolean(heading || quote);
+
+    /*
+     * Rebuilding a list item as a heading or a quote would take the list with
+     * it, so a marker typed inside one stays text.
+     */
+    if (blockMarker && block.closest("li")) return false;
+
     flushSnapshot();
+
+    if (blockMarker) {
+        removeMarker(line, range, prefix);
+        formatLine(line, heading ? `h${heading[1].length}` : "blockquote");
+        return true;
+    }
 
     const existing = block.closest("li");
     const nested = /^[ \t\u00a0]/.test(prefix);
     const tag = /^[ \t\u00a0]*[-*+]/.test(prefix) ? "ul" : "ol";
 
-    /*
-     * The marker is markup, not content, so it never reaches the list item.
-     * A bare text node is trimmed in place rather than deleted, since it is
-     * about to become the item's content, and the marker is its entire text
-     * up to the caret.
-     */
-    if (line.nodeType === Node.TEXT_NODE) {
-        line.deleteData(0, prefix.length);
-    } else {
-        const marker = document.createRange();
-
-        marker.selectNodeContents(line);
-        marker.setEnd(range.startContainer, range.startOffset);
-        marker.deleteContents();
-    }
+    removeMarker(line, range, prefix);
 
     const item = existing || listifyLine(line, tag);
 
@@ -1784,6 +1897,70 @@ function applyListMarker() {
     if (nested) nestListItem(item);
 
     return true;
+}
+
+/*
+ * The marker is markup, not content, so it never reaches the block. A bare
+ * text node is trimmed in place rather than deleted, since it is about to
+ * become the block's content, and the marker is its entire text up to the
+ * caret.
+ */
+function removeMarker(line, range, prefix) {
+    if (line.nodeType === Node.TEXT_NODE) {
+        line.deleteData(0, prefix.length);
+        return;
+    }
+
+    const marker = document.createRange();
+
+    marker.selectNodeContents(line);
+    marker.setEnd(range.startContainer, range.startOffset);
+    marker.deleteContents();
+}
+
+/*
+ * The line is rebuilt as the block it becomes, rather than handed to
+ * formatBlock. The command reads the block from the selection, and deleting
+ * the marker can leave the selection in an empty block, where the command
+ * promotes the line above instead. Moving the children across touches nothing
+ * but the line the marker was typed on.
+ */
+function formatLine(line, tag) {
+    if (
+        line.nodeType === Node.ELEMENT_NODE &&
+        line.tagName.toLowerCase() === tag
+    ) {
+        placeCaret(line);
+        return;
+    }
+
+    const element = document.createElement(tag);
+
+    if (line.nodeType === Node.TEXT_NODE) {
+        /*
+         * A bare text node is not a block, so it moves into the element whole
+         * rather than handing over children it does not have.
+         */
+        line.replaceWith(element);
+        element.appendChild(line);
+    } else {
+        while (line.firstChild) element.appendChild(line.firstChild);
+
+        line.replaceWith(element);
+    }
+
+    /*
+     * Chrome will not keep a caret in a block that holds nothing, and sends
+     * the next keystroke to the line above. Deleting the marker leaves the
+     * line with an empty text node at best, so the block is given the <br>
+     * the browser itself leaves behind when the same block is made with the
+     * heading menu.
+     */
+    if (!element.textContent && !element.querySelector("br")) {
+        element.replaceChildren(document.createElement("br"));
+    }
+
+    placeCaret(element);
 }
 
 /* ---------- Tab handling ---------- */
@@ -1873,17 +2050,128 @@ function handleTab(shiftKey) {
 
 /* ---------- Editor placeholder ---------- */
 
-function updatePlaceholder() {
-    /*
-     * An empty code block renders as its own box, so it is not an empty
-     * document even though it holds no text.
-     */
-    const empty =
-        editor.textContent.trim() === "" &&
-        !editor.querySelector("pre");
-
-    editor.classList.toggle("is-empty", empty);
+/*
+ * An empty code block renders as its own box, so it is not an empty document
+ * even though it holds no text. Clear entry and the placeholder read the same
+ * question, so they share the test.
+ */
+function editorIsEmpty() {
+    return editor.textContent.trim() === "" && !editor.querySelector("pre");
 }
+
+function updatePlaceholder() {
+    editor.classList.toggle("is-empty", editorIsEmpty());
+}
+
+/* ---------- Entry lifecycle ---------- */
+
+/*
+ * The entry survives a reload. What is worth keeping is the editor DOM, and
+ * it is already sanitised on the way in, so it is stored as HTML and put back
+ * through the same sanitiser on the way out: whatever is in storage is held to
+ * the rules a paste is held to, whether or not it came from one.
+ */
+const storageKey = "jff.entry.v1";
+const saveDelay = 400;
+
+let saveTimer = null;
+
+function storageAvailable() {
+    try {
+        return Boolean(window.localStorage);
+    } catch {
+        /* A blocked cookie store throws on the property, not on the write. */
+        return false;
+    }
+}
+
+function saveEntry() {
+    if (saveTimer) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+    }
+
+    if (!storageAvailable()) return;
+
+    try {
+        window.localStorage.setItem(storageKey, editor.innerHTML);
+    } catch {
+        /* A full or read-only store is not worth interrupting the edit for. */
+    }
+}
+
+function queueSave() {
+    if (!storageAvailable()) return;
+
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveEntry, saveDelay);
+}
+
+/*
+ * The debounce would otherwise drop the last keystrokes when the page is
+ * hidden or unloaded, which is the one case the entry is being kept for.
+ */
+function flushSave() {
+    if (saveTimer) saveEntry();
+}
+
+function restoreEntry() {
+    const stored = readStoredEntry();
+
+    if (!stored) return false;
+
+    const doc = new DOMParser().parseFromString(stored, "text/html");
+
+    sanitizeRichText(doc);
+    wrapOrphanListItems(doc.body);
+
+    if (doc.body.textContent.trim() === "" && !doc.body.querySelector("pre")) {
+        return false;
+    }
+
+    editor.innerHTML = doc.body.innerHTML;
+
+    return true;
+}
+
+/*
+ * Storage is read through the same guard as the write, so a browser that
+ * refuses the property simply starts with an empty editor.
+ */
+function readStoredEntry() {
+    if (!storageAvailable()) return "";
+
+    try {
+        return window.localStorage.getItem(storageKey) || "";
+    } catch {
+        return "";
+    }
+}
+
+/*
+ * Clearing is a content change like any other, so it goes through the undo
+ * stack rather than past it: the entry is recoverable with Ctrl+Z.
+ */
+function clearEntry() {
+    if (editorIsEmpty()) return;
+
+    flushSnapshot();
+
+    editor.innerHTML = "";
+    commitSnapshot();
+
+    render();
+    updateToolbarState();
+    editor.focus();
+}
+
+clearBtn.addEventListener("click", clearEntry);
+
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushSave();
+});
+
+window.addEventListener("pagehide", flushSave);
 
 /* ---------- ServiceNow serializer ---------- */
 
@@ -2250,12 +2538,17 @@ function render() {
         .replace(/[ \t]+$/, "");
 
     output.textContent = body;
+    output.classList.toggle("is-empty", body === "");
+    copyBtn.disabled = body === "";
 
     /*
      * render() is the one hook every content change already runs, so the
-     * placeholder is refreshed here rather than at each call site.
+     * placeholder, the Clear button and the saved entry are refreshed here
+     * rather than at each call site.
      */
     updatePlaceholder();
+    clearBtn.disabled = editorIsEmpty();
+    queueSave();
 }
 
 /* ---------- Paste handling ---------- */
@@ -2388,7 +2681,7 @@ editor.addEventListener("input", (event) => {
      * the space has not been inserted yet.
      */
     if (event.inputType === "insertText" && event.data === " ") {
-        applyListMarker();
+        applyTypedMarker();
     }
 
     queueSnapshot();
@@ -2479,6 +2772,14 @@ copyBtn.addEventListener("click", async () => {
  * and a style attribute would be stripped on the way in.
  */
 document.execCommand("styleWithCSS", false, false);
+
+buildShortcutList();
+
+/*
+ * A restored entry is the baseline the undo stack starts from, so it is in
+ * place before the first snapshot is taken.
+ */
+restoreEntry();
 
 commitSnapshot();
 render();
