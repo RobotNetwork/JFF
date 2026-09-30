@@ -551,7 +551,7 @@ const extraShortcuts = [
     { keys: "Shift+Tab", label: "Outdent a list item, or clear one indent" },
     {
         keys: "Enter",
-        label: "Next list item, or leave a code block on an empty line",
+        label: "Next list item, leave a code block or quote on an empty line, or step out of inline code",
     },
 ];
 
@@ -1492,6 +1492,233 @@ function matchesShortcut(shortcut, event) {
     );
 }
 
+/* ---------- Leaving a block ---------- */
+
+/*
+ * What `element` holds up to, or from, the caret. The clone is read with
+ * codeText rather than Range.toString(), which ignores <br> and the line a
+ * block child ends, and those are how a break reaches the DOM.
+ */
+function contentBeforeCaret(element, range) {
+    const before = document.createRange();
+
+    before.selectNodeContents(element);
+    before.setEnd(range.startContainer, range.startOffset);
+
+    return before.cloneContents();
+}
+
+function contentAfterCaret(element, range) {
+    const after = document.createRange();
+
+    after.selectNodeContents(element);
+    after.setStart(range.endContainer, range.endOffset);
+
+    return after.cloneContents();
+}
+
+/* Whether a caret's worth of content holds line structure and nothing else. */
+function isBlankContent(node) {
+    return (
+        codeText(node).replace(/\n/g, "").trim() === "" &&
+        !node.querySelector("*:not(br)")
+    );
+}
+
+/* The child of the editor that holds `node`. */
+function editorChild(node) {
+    let current = node;
+
+    while (current.parentNode && current.parentNode !== editor) {
+        current = current.parentNode;
+    }
+
+    return current;
+}
+
+/*
+ * The inline code span the caret sits in, or null. A <code> inside a <pre>
+ * is the code block's own element, and the code block rules own that one.
+ */
+function inlineCodeElement(node) {
+    const element = closestElement(node);
+    const code = element ? element.closest("code") : null;
+
+    return code && !code.closest("pre") && editor.contains(code) ? code : null;
+}
+
+/*
+ * The character that gives a caret a place of its own beside a code span.
+ * Chrome reads a caret at the boundary between a span and the text next to it
+ * as being inside the span, so a character typed there joins the code even
+ * when the caret has just been walked out. A text node of its own is read as
+ * prose, and this character is invisible, so the caret looks like it sits
+ * where it was put. It never reaches the output.
+ */
+const caretAnchor = "\u200b";
+
+/*
+ * Where a caret leaving the span belongs. Prose at the edge already holds a
+ * caret, and an anchor is added only where there is no text node to hold one,
+ * so a span at the start or the end of its line is the only case that writes
+ * to the document. The snapshot is committed here, before that write.
+ */
+function inlineCodeEscapePoint(code, forward) {
+    const sibling = forward ? code.nextSibling : code.previousSibling;
+    const text = sibling && sibling.nodeType === Node.TEXT_NODE ? sibling : null;
+
+    if (!forward && text && text.data) {
+        return { node: text, offset: text.data.length };
+    }
+
+    if (forward && text && text.data.startsWith(caretAnchor)) {
+        return { node: text, offset: 1 };
+    }
+
+    flushSnapshot();
+
+    const anchor = document.createTextNode(caretAnchor);
+
+    if (forward) {
+        code.after(anchor);
+    } else {
+        code.before(anchor);
+    }
+
+    return { node: anchor, offset: 1 };
+}
+
+/*
+ * Arrow keys step out of an inline code span at either edge. Chrome keeps a
+ * caret inside the span when there is nowhere else on the line to put it, so
+ * a span that ends its block traps the caret and the next character typed
+ * joins the code. Only the edge that has nowhere to go is taken over, and
+ * the caret is given one step, never two.
+ */
+function stepOutOfInlineCode(direction) {
+    const selection = window.getSelection();
+
+    if (!selection.rangeCount || !selection.isCollapsed) return false;
+
+    const range = selection.getRangeAt(0);
+    const code = inlineCodeElement(range.startContainer);
+
+    if (!code) return false;
+
+    const forward = direction > 0;
+    const atEdge = forward
+        ? range.endOffset >= nodeOffset(range.endContainer)
+        : range.startOffset === 0;
+
+    if (!atEdge) return false;
+
+    const beyond = forward
+        ? contentAfterCaret(code, range)
+        : contentBeforeCaret(code, range);
+
+    if (!isBlankContent(beyond)) return false;
+
+    const point = inlineCodeEscapePoint(code, forward);
+    const target = document.createRange();
+
+    target.setStart(point.node, point.offset);
+    target.collapse(true);
+
+    selection.removeAllRanges();
+    selection.addRange(target);
+
+    return true;
+}
+
+/*
+ * Enter inside inline code would put the break in the span, which [code]
+ * cannot hold, and Chrome's own paragraph command copies the span into the
+ * block below when it is the last thing in its block. Everything after the
+ * span moves into a new block of the same shape instead, so the break lands
+ * on the far side of it and the span stays whole.
+ */
+function splitBlockAfterInlineCode(code) {
+    const block = blockOf(code);
+    const anchor = block === editor ? editorChild(code) : block;
+    const paragraph = document.createElement(
+        block === editor ? "p" : anchor.tagName.toLowerCase(),
+    );
+
+    while (code.nextSibling) paragraph.appendChild(code.nextSibling);
+
+    if (!paragraph.firstChild) paragraph.innerHTML = "<br>";
+
+    anchor.after(paragraph);
+    placeCaret(paragraph);
+}
+
+/*
+ * The line the caret sits on inside a quote: the block-level child holding
+ * it, or the quote itself when the caret sits in the quote's own text, which
+ * is the shape both the toolbar command and a typed ">" leave behind.
+ */
+function quoteLineAt(quote, range) {
+    let node = range.startContainer;
+
+    while (node && node.parentNode !== quote) node = node.parentNode;
+
+    if (!node || node === quote || node.nodeType !== Node.ELEMENT_NODE) {
+        return quote;
+    }
+
+    return blockLevelTags.has(node.tagName.toLowerCase()) ? node : quote;
+}
+
+/*
+ * Whether nothing but line structure follows `line` inside `quote`.
+ */
+function blankAfterLine(quote, line) {
+    const rest = document.createRange();
+
+    rest.selectNodeContents(quote);
+    rest.setStartAfter(line);
+
+    return isBlankContent(rest.cloneContents());
+}
+
+/*
+ * An empty line at the end of a quote is the way out of it, as it is at the
+ * end of a code block: the caret has to be on that line, at the end of the
+ * quote, with nothing but line breaks ahead of it.
+ */
+function quoteExitIsReady(quote, range) {
+    const line = quoteLineAt(quote, range);
+    const beyond = contentAfterCaret(line, range);
+
+    if (!isBlankContent(beyond)) return false;
+
+    if (line !== quote && !blankAfterLine(quote, line)) return false;
+
+    return /(^|\n)$/.test(codeText(contentBeforeCaret(line, range)));
+}
+
+/*
+ * The empty line that triggered the exit goes with the quote, and the quote
+ * itself goes when nothing is left in it, so the caret's new paragraph never
+ * lands under an empty quote box.
+ */
+function exitBlockquote(quote, line) {
+    const paragraph = document.createElement("p");
+
+    paragraph.innerHTML = "<br>";
+    quote.after(paragraph);
+
+    if (line !== quote) {
+        line.remove();
+    } else if (quote.lastChild && quote.lastChild.nodeName === "BR") {
+        quote.lastChild.remove();
+    }
+
+    if (isBlankContent(quote)) quote.remove();
+
+    placeCaret(paragraph);
+}
+
 editor.addEventListener("keydown", (event) => {
     const mod = event.ctrlKey || event.metaKey;
 
@@ -1522,39 +1749,47 @@ editor.addEventListener("keydown", (event) => {
         return;
     }
 
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+        /*
+         * The caret leaves an inline code span at either edge, so the span
+         * cannot swallow what is typed after it. The default would add its
+         * own step on top of the one just taken, so it is suppressed.
+         */
+        if (
+            !mod &&
+            !event.shiftKey &&
+            stepOutOfInlineCode(event.key === "ArrowRight" ? 1 : -1)
+        ) {
+            event.preventDefault();
+            queueSnapshot();
+            render();
+            updateToolbarState();
+            return;
+        }
+    }
+
     if (event.key === "Enter" && !mod && !event.shiftKey) {
         const selection = window.getSelection();
 
-        if (selection.rangeCount && selection.isCollapsed) {
+        if (selection.rangeCount) {
             const range = selection.getRangeAt(0);
             const element = closestElement(range.startContainer);
             const pre = element ? element.closest("pre") : null;
 
             if (pre) {
                 /*
-                 * Range.toString() ignores <br>, and Enter inside a pre
-                 * produces <br>, so the line the caret sits on has to be read
+                 * Enter inside a pre produces <br>, and Range.toString()
+                 * ignores those, so the line the caret sits on has to be read
                  * from the DOM instead.
                  */
-                const before = document.createRange();
-
-                before.selectNodeContents(pre);
-                before.setEnd(range.startContainer, range.startOffset);
-
-                const after = document.createRange();
-
-                after.selectNodeContents(pre);
-                after.setStart(range.endContainer, range.endOffset);
-
-                const afterFragment = after.cloneContents();
-                const caretAtEnd =
-                    codeText(afterFragment).replace(/\n/g, "").trim() ===
-                        "" && !afterFragment.querySelector("*:not(br)");
+                const caretAtEnd = isBlankContent(
+                    contentAfterCaret(pre, range),
+                );
                 const currentLineEmpty = /(^|\n)$/.test(
-                    codeText(before.cloneContents()),
+                    codeText(contentBeforeCaret(pre, range)),
                 );
 
-                if (caretAtEnd && currentLineEmpty) {
+                if (selection.isCollapsed && caretAtEnd && currentLineEmpty) {
                     event.preventDefault();
                     flushSnapshot();
 
@@ -1577,6 +1812,45 @@ editor.addEventListener("keydown", (event) => {
                     pre.after(paragraph);
                     placeCaret(paragraph);
 
+                    queueSnapshot();
+                    render();
+                    updateToolbarState();
+                    return;
+                }
+            } else {
+                const code = inlineCodeElement(range.startContainer);
+
+                /*
+                 * A break inside inline code is not something [code] can hold,
+                 * so the break goes after the span and the span stays whole.
+                 * Chrome's own paragraph command would copy the span into the
+                 * block below, or drop it entirely when its contents are
+                 * selected, which is the selection the toolbar leaves behind.
+                 */
+                if (code && code.contains(range.endContainer)) {
+                    event.preventDefault();
+                    flushSnapshot();
+                    splitBlockAfterInlineCode(code);
+                    queueSnapshot();
+                    render();
+                    updateToolbarState();
+                    return;
+                }
+
+                /*
+                 * A blockquote traps the caret the way a code block does, and
+                 * it gets the same way out: an empty line at its end.
+                 */
+                const quote = element ? element.closest("blockquote") : null;
+
+                if (
+                    selection.isCollapsed &&
+                    quote &&
+                    quoteExitIsReady(quote, range)
+                ) {
+                    event.preventDefault();
+                    flushSnapshot();
+                    exitBlockquote(quote, quoteLineAt(quote, range));
                     queueSnapshot();
                     render();
                     updateToolbarState();
@@ -2053,10 +2327,14 @@ function handleTab(shiftKey) {
 /*
  * An empty code block renders as its own box, so it is not an empty document
  * even though it holds no text. Clear entry and the placeholder read the same
- * question, so they share the test.
+ * question, so they share the test. A caret anchor is invisible and is not
+ * content, so it does not count either.
  */
 function editorIsEmpty() {
-    return editor.textContent.trim() === "" && !editor.querySelector("pre");
+    return (
+        editor.textContent.replace(/\u200b/g, "").trim() === "" &&
+        !editor.querySelector("pre")
+    );
 }
 
 function updatePlaceholder() {
@@ -2291,11 +2569,15 @@ function serializeText(node, insideCode) {
      * there would display entities instead of the characters typed. A
      * delimiter written as literal prose would still mint a live region
      * downstream, though, so a zero-width space after the bracket breaks it
-     * for the renderer while staying invisible. This runs in the prose
+     * for the renderer while staying invisible. The zero-width spaces that
+     * hold a caret beside an inline code span are invisible too, and they are
+     * dropped before the delimiters are rewritten. This runs in the prose
      * branch only: the regions the app builds are minted later by wrapCode
      * and are left untouched.
      */
-    return text.replace(/\[(\/?code)\]/gi, "[\u200b$1]");
+    return text
+        .replace(/\u200b/g, "")
+        .replace(/\[(\/?code)\]/gi, "[\u200b$1]");
 }
 
 /*
