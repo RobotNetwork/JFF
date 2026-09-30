@@ -319,43 +319,149 @@ function runToolbarCommand(button) {
     requestAnimationFrame(updateToolbarState);
 }
 
+function execCommand(cmd, value) {
+    document.execCommand(cmd, false, value ?? null);
+
+    return false;
+}
+
+function queryCommandState(cmd) {
+    try {
+        return document.queryCommandState(cmd);
+    } catch {
+        return false;
+    }
+}
+
+/*
+ * Every command a toolbar button or a shortcut can name, with how it runs and
+ * how the toolbar reads its pressed state. Those were two switches over the
+ * same names, so a new button could work and never light up; one entry per
+ * command makes the pair impossible to separate, and checkCommandCoverage
+ * reports a name this table does not know.
+ *
+ * run() takes the button's data-val and returns true when the command has
+ * handed the rest of the turn to the link dialog. isActive() reads the
+ * element at the caret, and its absence - Clear formatting - means the
+ * command has no pressed state to show.
+ */
+const commands = {
+    bold: {
+        run: () => execCommand("bold"),
+        isActive: () => queryCommandState("bold"),
+    },
+    italic: {
+        run: () => execCommand("italic"),
+        isActive: () => queryCommandState("italic"),
+    },
+    underline: {
+        run: () => execCommand("underline"),
+        isActive: () => queryCommandState("underline"),
+    },
+    strikeThrough: {
+        run: () => execCommand("strikeThrough"),
+        isActive: () => queryCommandState("strikeThrough"),
+    },
+    insertUnorderedList: {
+        run: () => execCommand("insertUnorderedList"),
+        isActive: () => queryCommandState("insertUnorderedList"),
+    },
+    insertOrderedList: {
+        run: () => execCommand("insertOrderedList"),
+        isActive: () => queryCommandState("insertOrderedList"),
+    },
+    formatBlock: {
+        run: (value) => execCommand("formatBlock", value),
+        isActive: (value) =>
+            normalizeBlockName(document.queryCommandValue("formatBlock")) ===
+            normalizeBlockName(value),
+    },
+    inlineCode: {
+        run: () => {
+            wrapInlineCode();
+
+            return false;
+        },
+        isActive: (value, element) =>
+            Boolean(element.closest("code")) && !element.closest("pre"),
+    },
+    codeBlock: {
+        run: () => {
+            document.execCommand("formatBlock", false, "pre");
+            normalizeCodeBlocks(editor);
+
+            return false;
+        },
+        isActive: (value, element) => Boolean(element.closest("pre")),
+    },
+    link: {
+        run: () => insertLink(),
+        isActive: (value, element) => Boolean(element.closest("a")),
+    },
+    removeFormat: { run: () => execCommand("removeFormat") },
+};
+
 /*
  * Single entry point for the toolbar buttons and the keyboard shortcuts, so
  * a command behaves the same whichever way it is reached. The return value
  * reports a command that finishes later, out of the caller's turn.
  */
 function applyCommand(cmd, value) {
-    switch (cmd) {
-        case "formatBlock":
-            document.execCommand(cmd, false, value);
-            break;
+    return commands[cmd].run(value);
+}
 
-        case "inlineCode":
-            wrapInlineCode();
-            break;
+/*
+ * The toolbar markup, the shortcut table and the command table all name the
+ * same commands, and nothing in the language makes them agree. This is the
+ * guard the comment on the shortcut table promises: a name no command answers
+ * to fails at load rather than becoming a control that quietly does nothing.
+ */
+function checkCommandCoverage() {
+    for (const button of toolbar.querySelectorAll("button[data-cmd]")) {
+        const { cmd } = button.dataset;
 
-        case "codeBlock":
-            document.execCommand("formatBlock", false, "pre");
-            normalizeCodeBlocks(editor);
-            break;
-
-        case "link":
-            return insertLink();
-
-        default:
-            document.execCommand(cmd, false, null);
+        if (!commands[cmd]) {
+            throw new Error(`Toolbar button names no command: ${cmd}`);
+        }
     }
 
-    return false;
+    for (const { cmd } of editingShortcuts) {
+        /* Undo and redo walk the snapshot stack in the key handler instead. */
+        if (!commands[cmd] && cmd !== "undo" && cmd !== "redo") {
+            throw new Error(`Shortcut names no command: ${cmd}`);
+        }
+    }
 }
+
+/*
+ * The heading levels, in order. Every list of h1 to h6 - the two selectors,
+ * the sanitizer's allowlist, the serializer's switch, the typed and markdown
+ * marker patterns - derives from this, so the set has one definition.
+ */
+const headingLevels = ["h1", "h2", "h3", "h4", "h5", "h6"];
+const headingSelector = headingLevels.join(", ");
+const headingHashPattern = new RegExp(
+    `^(#{1,${headingLevels.length}})\\s+(.*)$`,
+);
+const headingMarkerPattern = new RegExp(
+    `^(#{1,${headingLevels.length}}) $`,
+);
 
 /*
  * The element that starts a line, for deciding whether a range stays inside
  * one block. A range that crosses blocks would wrap the blocks themselves,
  * which [code] cannot hold.
  */
-const blockSelector =
-    "p, div, li, blockquote, pre, ul, ol, h1, h2, h3, h4, h5, h6";
+const blockSelector = [
+    "p",
+    "div",
+    "li",
+    "blockquote",
+    "pre",
+    "ul",
+    "ol",
+    ...headingLevels,
+].join(", ");
 
 function blockOf(node) {
     const element = closestElement(node);
@@ -623,6 +729,45 @@ function buildShortcutList() {
     }
 }
 
+/*
+ * The entry recording a command, or null. The value narrows it: Ctrl+Alt+1 is
+ * the h1 command, not the blockquote one.
+ */
+function shortcutFor(cmd, value) {
+    return editingShortcuts.find(
+        (entry) =>
+            entry.cmd === cmd &&
+            (value === undefined
+                ? entry.val === undefined
+                : entry.val === value),
+    );
+}
+
+/*
+ * The hover text of every button that carries an aria-label: the label names
+ * it, and the chord comes from the table the dialog is built from. Tooltips
+ * used to spell the chords out by hand, so rebinding one in the table left
+ * the tooltip advertising the old key.
+ */
+function buildTooltips() {
+    for (const button of document.querySelectorAll("button[aria-label]")) {
+        const { cmd, val } = button.dataset;
+        const shortcut = cmd ? shortcutFor(cmd, val) : null;
+        const name = button.getAttribute("aria-label");
+
+        button.title = shortcut ? `${name} (${chordLabel(shortcut)})` : name;
+    }
+
+    /*
+     * Clear is not a formatting command, so the table has no entry for it,
+     * but its tooltip points at the undo chord, which does come from there.
+     */
+    const clearLabel = clearBtn.getAttribute("aria-label");
+    const undo = chordLabel(shortcutFor("undo"));
+
+    clearBtn.title = `${clearLabel} and start again (${undo} to undo)`;
+}
+
 shortcutBtn.addEventListener("click", () => {
     shortcutsDialog.showModal();
 });
@@ -651,55 +796,19 @@ function updateToolbarState() {
         if (button.closest(".dropdown")) continue;
 
         const { cmd, val } = button.dataset;
+        const command = commands[cmd];
 
-        if (!cmd || cmd === "removeFormat") continue;
+        /*
+         * Clear formatting carries no pressed state, and a button naming a
+         * command nobody knows is checkCommandCoverage's to report rather
+         * than something to push back to a false press here.
+         */
+        if (!command?.isActive) continue;
 
-        let active = false;
-
-        if (selectedElement) {
-            switch (cmd) {
-                case "bold":
-                case "italic":
-                case "underline":
-                case "strikeThrough":
-                case "insertUnorderedList":
-                case "insertOrderedList":
-                    try {
-                        active = document.queryCommandState(cmd);
-                    } catch {
-                        active = false;
-                    }
-                    break;
-
-                case "formatBlock": {
-                    const currentBlock = normalizeBlockName(
-                        document.queryCommandValue("formatBlock"),
-                    );
-
-                    active =
-                        currentBlock === normalizeBlockName(val);
-                    break;
-                }
-
-                case "inlineCode":
-                    active =
-                        Boolean(selectedElement.closest("code")) &&
-                        !selectedElement.closest("pre");
-                    break;
-
-                case "codeBlock":
-                    active = Boolean(
-                        selectedElement.closest("pre"),
-                    );
-                    break;
-
-                case "link":
-                    active = Boolean(selectedElement.closest("a"));
-                    break;
-            }
-        }
-
-        setButtonActive(button, active);
+        setButtonActive(
+            button,
+            selectedElement ? command.isActive(val, selectedElement) : false,
+        );
     }
 
     /*
@@ -719,9 +828,7 @@ function updateToolbarState() {
  */
 function headingLevelInUse() {
     const element = getSelectedElement();
-    const heading = element
-        ? element.closest("h1, h2, h3, h4, h5, h6")
-        : null;
+    const heading = element ? element.closest(headingSelector) : null;
 
     return heading && editor.contains(heading)
         ? heading.tagName.toLowerCase()
@@ -897,7 +1004,7 @@ function markdownToHtml(markdown) {
         if (/^\s*```[\w-]*\s*$/.test(line)) {
             closeList();
             fence = [];
-        } else if ((match = line.match(/^(#{1,6})\s+(.*)$/))) {
+        } else if ((match = line.match(headingHashPattern))) {
             /*
              * ServiceNow renders each heading level as written, so the hash
              * count maps straight to the tag rather than collapsing to h3.
@@ -963,12 +1070,7 @@ const blockLevelTags = new Set([
     "pre",
     "ul",
     "ol",
-    "h1",
-    "h2",
-    "h3",
-    "h4",
-    "h5",
-    "h6",
+    ...headingLevels,
 ]);
 
 const inlineFormatTags = [
@@ -1369,12 +1471,7 @@ function sanitizeRichText(doc) {
         "ul",
         "ol",
         "li",
-        "h1",
-        "h2",
-        "h3",
-        "h4",
-        "h5",
-        "h6",
+        ...headingLevels,
         "br",
         "p",
         "div",
@@ -1455,7 +1552,8 @@ function wrapOrphanListItems(root) {
  * Ctrl+Shift+8 produces a different character on a different layout.
  *
  * The table is the reference for what the editor can do without a mouse, so
- * it covers every toolbar button.
+ * it covers every toolbar button. checkCommandCoverage rejects a name here
+ * that the command table does not know.
  */
 const editingShortcuts = [
     { key: "b", cmd: "bold" },
@@ -1469,12 +1567,13 @@ const editingShortcuts = [
     { code: "Backquote", cmd: "inlineCode" },
     { code: "Backquote", shift: true, cmd: "codeBlock" },
     { code: "Backslash", cmd: "removeFormat" },
-    { code: "Digit1", alt: true, cmd: "formatBlock", val: "h1" },
-    { code: "Digit2", alt: true, cmd: "formatBlock", val: "h2" },
-    { code: "Digit3", alt: true, cmd: "formatBlock", val: "h3" },
-    { code: "Digit4", alt: true, cmd: "formatBlock", val: "h4" },
-    { code: "Digit5", alt: true, cmd: "formatBlock", val: "h5" },
-    { code: "Digit6", alt: true, cmd: "formatBlock", val: "h6" },
+    /* Ctrl+Alt+1 through Ctrl+Alt+6, one per level in headingLevels order. */
+    ...headingLevels.map((level, index) => ({
+        code: `Digit${index + 1}`,
+        alt: true,
+        cmd: "formatBlock",
+        val: level,
+    })),
     { key: "z", cmd: "undo" },
     { key: "y", cmd: "redo" },
     { key: "z", shift: true, cmd: "redo" },
@@ -1900,9 +1999,9 @@ const listMarkerPattern = /^[ \t\u00a0]*(?:[-*+]|\d+[.)]) $/;
 /*
  * The other two markers an editor recognises. They are anchored to the line
  * with no leading whitespace: indentation is the nesting signal for a list,
- * but a heading or a quote indented by accident stays text.
+ * but a heading or a quote indented by accident stays text. The heading one
+ * is built from headingLevels, up with the rest of the levels.
  */
-const headingMarkerPattern = /^(#{1,6}) $/;
 const quoteMarkerPattern = /^> $/;
 
 /*
@@ -2331,8 +2430,14 @@ function handleTab(shiftKey) {
  * so they do not count. Clear entry and the placeholder read the same
  * question, so they share the test.
  */
-const structureSelector =
-    "pre, blockquote, ul, ol, li, h1, h2, h3, h4, h5, h6";
+const structureSelector = [
+    "pre",
+    "blockquote",
+    "ul",
+    "ol",
+    "li",
+    ...headingLevels,
+].join(", ");
 
 function editorIsEmpty() {
     return (
@@ -2476,12 +2581,7 @@ const blockTags = new Set([
     "blockquote",
     "ul",
     "ol",
-    "h1",
-    "h2",
-    "h3",
-    "h4",
-    "h5",
-    "h6",
+    ...headingLevels,
 ]);
 
 /*
@@ -2495,18 +2595,25 @@ const codeBreakTags = new Set([
     "div",
     "li",
     "blockquote",
-    "h1",
-    "h2",
-    "h3",
-    "h4",
-    "h5",
-    "h6",
+    ...headingLevels,
 ]);
 
 const codeBreakSelector = [...codeBreakTags].join(", ");
 
+/*
+ * The delimiter ServiceNow reads as a code region. The three places that
+ * spell it out - minting it in wrapCode, splitting it back out in codeRegion,
+ * and breaking one typed as prose in serializeText - all derive from these,
+ * so the wire format has one definition and no site can drift alone.
+ */
+const codeTag = "code";
+const codeOpen = `[${codeTag}]`;
+const codeClose = `[/${codeTag}]`;
+
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 function wrapCode(html) {
-    return html ? `[code]${html}[/code]` : "";
+    return html ? `${codeOpen}${html}${codeClose}` : "";
 }
 
 function normalizeHref(value) {
@@ -2581,7 +2688,9 @@ function serializeText(node, insideCode) {
      */
     return text
         .replace(/\u200b/g, "")
-        .replace(/\[(\/?code)\]/gi, "[\u200b$1]");
+        .replace(typedCodeDelimiter, (delimiter) =>
+            delimiter.replace("[", "[\u200b"),
+        );
 }
 
 /*
@@ -2675,6 +2784,14 @@ function serializeHtmlElement(element) {
 
     const inner = serializeChildren(element, true);
 
+    /*
+     * ServiceNow keeps the level it is given, so an h1 stays an h1 instead of
+     * being rewritten to h3 or demoted to bold.
+     */
+    if (headingLevels.includes(tag)) {
+        return `<${tag}>${inner}</${tag}>`;
+    }
+
     switch (tag) {
         case "b":
         case "strong":
@@ -2716,18 +2833,6 @@ function serializeHtmlElement(element) {
 
         case "li":
             return `<li>${inner}</li>`;
-
-        case "h1":
-        case "h2":
-        case "h3":
-        case "h4":
-        case "h5":
-        case "h6":
-            /*
-             * ServiceNow keeps the level it is given, so an h1 stays an h1
-             * instead of being rewritten to h3 or demoted to bold.
-             */
-            return `<${tag}>${inner}</${tag}>`;
 
         case "br":
             /*
@@ -2801,7 +2906,15 @@ function serializeNode(node, insideCode = false) {
  * split() keeps the captured [code] regions at odd indices. Only the prose
  * is tidied, so code keeps its trailing whitespace and blank lines.
  */
-const codeRegion = /(\[code\][\s\S]*?\[\/code\])/;
+const codeRegion = new RegExp(
+    `(${escapeRegExp(codeOpen)}[\\s\\S]*?${escapeRegExp(codeClose)})`,
+);
+
+/* A delimiter typed as prose, whole, so it can be broken in the middle. */
+const typedCodeDelimiter = new RegExp(
+    `${escapeRegExp(codeOpen)}|${escapeRegExp(codeClose)}`,
+    "gi",
+);
 
 function tidyProse(text) {
     return text
@@ -2947,7 +3060,10 @@ function looksLikeCode(text) {
 }
 
 function looksLikeMarkdown(text) {
-    const blockMarker = /^(#{1,6}\s|[-*+]\s|\d+[.)]\s|>\s|```)/m;
+    const blockMarker = new RegExp(
+        `^(#{1,${headingLevels.length}}\\s|[-*+]\\s|\\d+[.)]\\s|>\\s|\`\`\`)`,
+        "m",
+    );
     const inlineMarker =
         /(\*\*[^*]+\*\*|`[^`]+`|~~[^~]+~~|\[[^\]]+\]\([^)]+\))/;
 
@@ -2985,6 +3101,9 @@ document.addEventListener("selectionchange", () => {
 
 const copyLabelDelay = 1200;
 
+/* The label the flash returns to is the button's own, so it is written once. */
+const copyLabel = copyBtn.textContent.trim();
+
 let copyLabelTimer = null;
 
 function flashCopyLabel(text, failed) {
@@ -2999,7 +3118,7 @@ function flashCopyLabel(text, failed) {
 
     copyLabelTimer = setTimeout(() => {
         copyLabelTimer = null;
-        copyBtn.textContent = "Copy";
+        copyBtn.textContent = copyLabel;
         copyBtn.classList.remove("error");
     }, copyLabelDelay);
 }
@@ -3059,6 +3178,11 @@ copyBtn.addEventListener("click", async () => {
  */
 document.execCommand("styleWithCSS", false, false);
 
+/* The tab title follows the heading, so the name is written once. */
+document.title = document.querySelector("header h1").textContent.trim();
+
+checkCommandCoverage();
+buildTooltips();
 buildShortcutList();
 
 /*

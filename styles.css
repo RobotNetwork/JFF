@@ -6,6 +6,12 @@
     --border-strong: #7a818c;
     --text: #e4e7eb;
     --accent: #62d84e;
+    /* Text and glyphs on an accent fill. */
+    --accent-ink: #111;
+    /* The code wells: the editor's pre and code, the output pane, a dialog input. */
+    --code-bg: #14161a;
+    /* A copy failure and a rejected link URL. */
+    --danger: #e5534b;
     --muted: #9aa1ab;
     --mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
 }
@@ -146,13 +152,15 @@ main {
 
 .toolbar button[aria-pressed="true"] {
     border-color: var(--accent);
-    background: rgba(98, 216, 78, 0.18);
+    /* The accent at a lower alpha, taken from the accent itself so a colour
+       change reaches the pressed states too. */
+    background: rgb(from var(--accent) r g b / 0.18);
     color: var(--accent);
     box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 .toolbar button[aria-pressed="true"]:hover {
-    background: rgba(98, 216, 78, 0.25);
+    background: rgb(from var(--accent) r g b / 0.25);
 }
 
 .toolbar .sep {
@@ -214,7 +222,7 @@ main {
 
 .dropdown-menu button[aria-checked="true"] {
     border-color: var(--accent);
-    background: rgba(98, 216, 78, 0.18);
+    background: rgb(from var(--accent) r g b / 0.18);
     color: var(--accent);
 }
 
@@ -235,7 +243,8 @@ main {
  * box that would push the first paragraph down.
  */
 #editor.is-empty::before {
-    content: attr(data-placeholder);
+    /* The hint and what a screen reader announces are the same attribute. */
+    content: attr(aria-placeholder);
     position: absolute;
     color: var(--muted);
     pointer-events: none;
@@ -253,7 +262,7 @@ main {
 }
 
 #editor:focus {
-    background: rgba(98, 216, 78, 0.02);
+    background: rgb(from var(--accent) r g b / 0.02);
     outline: 2px solid var(--accent);
     outline-offset: -2px;
 }
@@ -270,7 +279,7 @@ main {
     padding: 10px 12px;
     border: 1px solid var(--border);
     border-radius: 6px;
-    background: #14161a;
+    background: var(--code-bg);
     font-family: var(--mono);
     font-size: 13px;
 }
@@ -279,7 +288,7 @@ main {
     padding: 1px 5px;
     border: 1px solid var(--border);
     border-radius: 4px;
-    background: #14161a;
+    background: var(--code-bg);
     font-family: var(--mono);
     font-size: 13px;
     font-weight: 700;
@@ -315,7 +324,7 @@ main {
     border: none;
     border-radius: 4px;
     background: var(--accent);
-    color: #111;
+    color: var(--accent-ink);
     font-family: inherit;
     font-size: 13px;
     font-weight: 600;
@@ -336,7 +345,7 @@ main {
 }
 
 .output-head button.error {
-    background: #e5534b;
+    background: var(--danger);
     color: #fff;
 }
 #output {
@@ -344,7 +353,7 @@ main {
     overflow-y: auto;
     margin: 0;
     padding: 16px 20px;
-    background: #14161a;
+    background: var(--code-bg);
     font-family: var(--mono);
     font-size: 13px;
     line-height: 1.5;
@@ -443,7 +452,7 @@ main {
     padding: 6px 8px;
     border: 1px solid var(--border-strong);
     border-radius: 4px;
-    background: #14161a;
+    background: var(--code-bg);
     color: var(--text);
     font-family: inherit;
     font-size: 13px;
@@ -456,7 +465,7 @@ main {
 
 .link-error {
     margin: 0;
-    color: #e5534b;
+    color: var(--danger);
     font-size: 12px;
 }
 
@@ -486,12 +495,12 @@ main {
 .dialog-actions .primary {
     border-color: var(--accent);
     background: var(--accent);
-    color: #111;
+    color: var(--accent-ink);
     font-weight: 600;
 }
 
 .dialog-actions .primary:hover {
-    color: #111;
+    color: var(--accent-ink);
     filter: brightness(1.1);
 }
 

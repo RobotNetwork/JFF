@@ -3,6 +3,8 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <!-- Overwritten from the h1 below at start-up, so the name is written
+             once; this copy is only what the tab shows before app.js runs. -->
         <title>Journal Entry Formatter</title>
         <link
             rel="icon"
@@ -23,7 +25,6 @@
                     id="shortcutBtn"
                     aria-label="Keyboard shortcuts"
                     aria-haspopup="dialog"
-                    title="Keyboard shortcuts"
                 >
                     ?
                 </button>
@@ -41,7 +42,6 @@
                     <button
                         type="button"
                         data-cmd="bold"
-                        title="Bold (Ctrl+B)"
                         aria-label="Bold"
                         aria-pressed="false"
                     >
@@ -51,7 +51,6 @@
                     <button
                         type="button"
                         data-cmd="italic"
-                        title="Italic (Ctrl+I)"
                         aria-label="Italic"
                         aria-pressed="false"
                     >
@@ -61,7 +60,6 @@
                     <button
                         type="button"
                         data-cmd="underline"
-                        title="Underline (Ctrl+U)"
                         aria-label="Underline"
                         aria-pressed="false"
                     >
@@ -71,7 +69,6 @@
                     <button
                         type="button"
                         data-cmd="strikeThrough"
-                        title="Strikethrough (Ctrl+Shift+X)"
                         aria-label="Strikethrough"
                         aria-pressed="false"
                     >
@@ -81,7 +78,6 @@
                     <button
                         type="button"
                         data-cmd="insertUnorderedList"
-                        title="Bullet list (Ctrl+Shift+8)"
                         aria-label="Bullet list"
                         aria-pressed="false"
                     >
@@ -91,7 +87,6 @@
                     <button
                         type="button"
                         data-cmd="insertOrderedList"
-                        title="Numbered list (Ctrl+Shift+7)"
                         aria-label="Numbered list"
                         aria-pressed="false"
                     >
@@ -106,7 +101,6 @@
                             aria-haspopup="menu"
                             aria-expanded="false"
                             aria-label="Heading level"
-                            title="Heading (Ctrl+Alt+1-6)"
                         >
                             Heading
                         </button>
@@ -125,7 +119,6 @@
                                 aria-label="Heading 1"
                                 data-cmd="formatBlock"
                                 data-val="h1"
-                                title="Heading 1 (Ctrl+Alt+1)"
                             >
                                 H1
                             </button>
@@ -137,7 +130,6 @@
                                 aria-label="Heading 2"
                                 data-cmd="formatBlock"
                                 data-val="h2"
-                                title="Heading 2 (Ctrl+Alt+2)"
                             >
                                 H2
                             </button>
@@ -149,7 +141,6 @@
                                 aria-label="Heading 3"
                                 data-cmd="formatBlock"
                                 data-val="h3"
-                                title="Heading 3 (Ctrl+Alt+3)"
                             >
                                 H3
                             </button>
@@ -161,7 +152,6 @@
                                 aria-label="Heading 4"
                                 data-cmd="formatBlock"
                                 data-val="h4"
-                                title="Heading 4 (Ctrl+Alt+4)"
                             >
                                 H4
                             </button>
@@ -173,7 +163,6 @@
                                 aria-label="Heading 5"
                                 data-cmd="formatBlock"
                                 data-val="h5"
-                                title="Heading 5 (Ctrl+Alt+5)"
                             >
                                 H5
                             </button>
@@ -185,7 +174,6 @@
                                 aria-label="Heading 6"
                                 data-cmd="formatBlock"
                                 data-val="h6"
-                                title="Heading 6 (Ctrl+Alt+6)"
                             >
                                 H6
                             </button>
@@ -196,7 +184,6 @@
                         type="button"
                         data-cmd="formatBlock"
                         data-val="blockquote"
-                        title="Blockquote (Ctrl+Shift+&gt;)"
                         aria-label="Blockquote"
                         aria-pressed="false"
                     >
@@ -208,7 +195,6 @@
                     <button
                         type="button"
                         data-cmd="inlineCode"
-                        title="Inline code (Ctrl+`)"
                         aria-label="Inline code"
                         aria-pressed="false"
                     >
@@ -218,7 +204,6 @@
                     <button
                         type="button"
                         data-cmd="codeBlock"
-                        title="Code block (Ctrl+Shift+`)"
                         aria-label="Code block"
                         aria-pressed="false"
                     >
@@ -228,7 +213,6 @@
                     <button
                         type="button"
                         data-cmd="link"
-                        title="Insert link (Ctrl+K)"
                         aria-label="Insert link"
                         aria-pressed="false"
                     >
@@ -238,7 +222,6 @@
                     <button
                         type="button"
                         data-cmd="removeFormat"
-                        title="Clear formatting (Ctrl+\)"
                         aria-label="Clear formatting"
                     >
                         ✕
@@ -250,7 +233,6 @@
                         type="button"
                         id="clearBtn"
                         aria-label="Clear the entry"
-                        title="Clear the entry and start again (Ctrl+Z to undo)"
                     >
                         Clear
                     </button>
@@ -264,13 +246,12 @@
                     aria-label="Journal entry"
                     aria-placeholder="Type or paste your journal entry here…"
                     spellcheck="true"
-                    data-placeholder="Type or paste your journal entry here…"
                 ></div>
             </div>
 
             <div class="pane">
                 <div class="output-head">
-                    <span>ServiceNow journal output</span>
+                    <span id="outputLabel">ServiceNow journal output</span>
                     <button type="button" id="copyBtn" disabled>Copy</button>
                 </div>
 
@@ -278,7 +259,7 @@
                     id="output"
                     data-empty="Markup appears here as you type."
                     aria-live="polite"
-                    aria-label="ServiceNow journal output"
+                    aria-labelledby="outputLabel"
                 ></pre>
             </div>
         </main>
@@ -334,7 +315,7 @@
                 <ul class="shortcut-list" id="shortcutList" role="list"></ul>
 
                 <p class="shortcut-note">
-                    Ctrl on Windows and Linux, Cmd on macOS.
+                    Ctrl on Windows/Linux, Cmd on macOS.
                 </p>
 
                 <div class="dialog-actions">
