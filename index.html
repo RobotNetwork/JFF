@@ -259,6 +259,46 @@
             </div>
         </main>
 
+        <dialog
+            id="linkDialog"
+            class="link-dialog"
+            aria-labelledby="linkDialogTitle"
+        >
+            <form id="linkForm" class="link-form">
+                <h2 id="linkDialogTitle">Insert link</h2>
+
+                <label for="linkUrl">URL</label>
+                <input
+                    id="linkUrl"
+                    name="url"
+                    type="text"
+                    inputmode="url"
+                    autocomplete="off"
+                    spellcheck="false"
+                    placeholder="https://"
+                />
+
+                <p class="link-error" id="linkError" role="alert" hidden>
+                    Enter an http, https, mailto, tel, or site-relative URL.
+                </p>
+
+                <div class="link-text" id="linkTextRow" hidden>
+                    <label for="linkText">Text</label>
+                    <input
+                        id="linkText"
+                        name="text"
+                        type="text"
+                        autocomplete="off"
+                    />
+                </div>
+
+                <div class="link-actions">
+                    <button type="button" id="linkCancel">Cancel</button>
+                    <button type="submit" class="primary">Insert</button>
+                </div>
+            </form>
+        </dialog>
+
         <script src="app.js"></script>
     </body>
 </html>

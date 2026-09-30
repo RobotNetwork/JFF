@@ -4,6 +4,13 @@ const copyBtn = document.getElementById("copyBtn");
 const toolbar = document.getElementById("toolbar");
 const headingToggle = document.getElementById("headingToggle");
 const headingMenu = document.getElementById("headingMenu");
+const linkDialog = document.getElementById("linkDialog");
+const linkForm = document.getElementById("linkForm");
+const linkUrl = document.getElementById("linkUrl");
+const linkText = document.getElementById("linkText");
+const linkTextRow = document.getElementById("linkTextRow");
+const linkError = document.getElementById("linkError");
+const linkCancel = document.getElementById("linkCancel");
 
 /* ---------- Custom undo/redo history ---------- */
 
@@ -294,7 +301,11 @@ function runToolbarCommand(button) {
 
     const { cmd, val } = button.dataset;
 
-    applyCommand(cmd, val);
+    /*
+     * A command that defers to the link dialog owns focus until the dialog
+     * closes, so the caret restore and redraw are left to it.
+     */
+    if (applyCommand(cmd, val)) return;
 
     editor.focus();
     queueSnapshot();
@@ -305,7 +316,8 @@ function runToolbarCommand(button) {
 
 /*
  * Single entry point for the toolbar buttons and the keyboard shortcuts, so
- * a command behaves the same whichever way it is reached.
+ * a command behaves the same whichever way it is reached. The return value
+ * reports a command that finishes later, out of the caller's turn.
  */
 function applyCommand(cmd, value) {
     switch (cmd) {
@@ -323,12 +335,13 @@ function applyCommand(cmd, value) {
             break;
 
         case "link":
-            insertLink();
-            break;
+            return insertLink();
 
         default:
             document.execCommand(cmd, false, null);
     }
+
+    return false;
 }
 
 /*
@@ -382,31 +395,141 @@ function wrapInlineCode() {
     selection.addRange(selectedRange);
 }
 
+/*
+ * The dialog takes focus, and both createLink and the caret restore need the
+ * selection the command was invoked on, so the range is cloned up front and
+ * the caller is told the command has been handed over. It reports false when
+ * there is no selection in the editor to build a link from, leaving the
+ * caller with the ordinary path.
+ */
 function insertLink() {
-    const url = prompt("Link URL:", "https://");
+    const selection = window.getSelection();
 
-    if (!url) return;
+    const source =
+        selection.rangeCount &&
+        editor.contains(selection.getRangeAt(0).commonAncestorContainer)
+            ? selection.getRangeAt(0)
+            : null;
+
+    if (!source) return false;
+
+    openLinkDialog(source.cloneRange());
+
+    return true;
+}
+
+/* ---------- Link dialog ---------- */
+
+/*
+ * The link being built while the dialog is open. Null outside it. The range
+ * is the cloned selection, and href stays empty until the form is submitted,
+ * which is what separates a confirmed link from a cancelled one.
+ */
+let pendingLink = null;
+
+/*
+ * A press that starts on the dialog rather than the form is a press on the
+ * backdrop. Tracking it keeps a text selection dragged out of the URL field
+ * from being read as a click outside, which would close the dialog and throw
+ * the field away.
+ */
+let backdropPress = false;
+
+function openLinkDialog(range) {
+    pendingLink = { range, collapsed: range.collapsed, href: "", text: "" };
+
+    linkError.hidden = true;
+    linkUrl.value = "";
+    linkText.value = "";
+
+    /* An existing selection already supplies the link text. */
+    linkTextRow.hidden = !range.collapsed;
+
+    linkDialog.showModal();
+    linkUrl.focus();
+}
+
+function restoreLinkSelection(range) {
+    editor.focus();
+
+    const selection = window.getSelection();
+
+    selection.removeAllRanges();
+    selection.addRange(range);
+}
+
+function closeLinkDialog() {
+    if (linkDialog.open) linkDialog.close();
+}
+
+linkForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+
+    if (!pendingLink) return;
+
+    const href = normalizeHref(linkUrl.value);
+
+    if (!href) {
+        linkError.hidden = false;
+        linkUrl.focus();
+        return;
+    }
 
     /*
      * The URL is validated before it reaches the DOM, so the editor never
      * holds a link the serializer would have to reject anyway.
      */
-    const href = normalizeHref(url);
+    pendingLink.href = href;
+    pendingLink.text = linkText.value.trim();
 
-    if (!href) return;
+    closeLinkDialog();
+});
 
-    const selection = window.getSelection();
+linkCancel.addEventListener("click", closeLinkDialog);
 
-    if (!selection.rangeCount || selection.isCollapsed) {
-        const text = prompt("Link text:", href) || href;
+linkDialog.addEventListener("pointerdown", (event) => {
+    backdropPress = event.target === linkDialog;
+});
+
+linkDialog.addEventListener("click", (event) => {
+    if (backdropPress && event.target === linkDialog) closeLinkDialog();
+
+    backdropPress = false;
+});
+
+/*
+ * The dialog is already closed by the time this runs, whether it went
+ * through the form, Escape, or the backdrop, so the editor can take focus
+ * back and the deferred command can finish.
+ */
+linkDialog.addEventListener("close", () => {
+    const pending = pendingLink;
+
+    pendingLink = null;
+    backdropPress = false;
+    linkError.hidden = true;
+
+    if (!pending) return;
+
+    restoreLinkSelection(pending.range);
+
+    if (!pending.href) return;
+
+    if (pending.collapsed) {
+        const text = pending.text || pending.href;
 
         insertHtmlAtCursor(
-            `<a href="${escapeAttr(href)}">${escapeHtml(text)}</a>&nbsp;`,
+            `<a href="${escapeAttr(pending.href)}">${escapeHtml(text)}</a>&nbsp;`,
         );
-    } else {
-        document.execCommand("createLink", false, href);
+        return;
     }
-}
+
+    document.execCommand("createLink", false, pending.href);
+
+    queueSnapshot();
+    render();
+    updateToolbarState();
+});
 
 /* ---------- Toolbar active state ---------- */
 
@@ -1383,7 +1506,10 @@ editor.addEventListener("keydown", (event) => {
     }
 
     flushSnapshot();
-    applyCommand(shortcut.cmd, shortcut.val);
+
+    /* The same deferral as the toolbar: the link dialog takes it from here. */
+    if (applyCommand(shortcut.cmd, shortcut.val)) return;
+
     queueSnapshot();
     render();
     updateToolbarState();

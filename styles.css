@@ -300,3 +300,114 @@ main {
         border-bottom: none;
     }
 }
+
+/* ---------- Link dialog ---------- */
+
+/*
+ * The dialog box itself stays transparent and unpadded, so every click that
+ * lands on it rather than on the form is a click on the backdrop.
+ */
+.link-dialog {
+    padding: 0;
+    border: none;
+    background: transparent;
+}
+
+.link-dialog::backdrop {
+    background: rgb(0 0 0 / 55%);
+}
+
+.link-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 22rem;
+    max-width: 100%;
+    padding: 16px;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    background: var(--panel);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 50%);
+}
+
+/*
+ * The URL row is a direct child of the form, so the form's stretch reaches
+ * it. The text row is nested, and its input would otherwise fall back to the
+ * intrinsic width of an input box, so it stretches its own children.
+ */
+.link-text {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* The rule above outranks the user agent's display:none for [hidden]. */
+.link-text[hidden] {
+    display: none;
+}
+
+.link-form h2 {
+    margin: 0 0 6px;
+    font-size: 15px;
+}
+
+.link-form label {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.link-form input {
+    padding: 6px 8px;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    background: #14161a;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+}
+
+.link-form input:focus {
+    border-color: var(--accent);
+    outline: none;
+}
+
+.link-error {
+    margin: 0;
+    color: #e5534b;
+    font-size: 12px;
+}
+
+.link-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.link-actions button {
+    padding: 5px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.link-actions button:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.link-actions .primary {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #111;
+    font-weight: 600;
+}
+
+.link-actions .primary:hover {
+    color: #111;
+    filter: brightness(1.1);
+}
