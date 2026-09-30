@@ -2325,15 +2325,19 @@ function handleTab(shiftKey) {
 /* ---------- Editor placeholder ---------- */
 
 /*
- * An empty code block renders as its own box, so it is not an empty document
- * even though it holds no text. Clear entry and the placeholder read the same
- * question, so they share the test. A caret anchor is invisible and is not
- * content, so it does not count either.
+ * A block that draws something of its own - a code box, a list marker, a quote
+ * bar, a heading's spacing - is not an empty document even though it holds no
+ * text. A plain paragraph, a bare <br>, and the caret anchor are all invisible,
+ * so they do not count. Clear entry and the placeholder read the same
+ * question, so they share the test.
  */
+const structureSelector =
+    "pre, blockquote, ul, ol, li, h1, h2, h3, h4, h5, h6";
+
 function editorIsEmpty() {
     return (
         editor.textContent.replace(/\u200b/g, "").trim() === "" &&
-        !editor.querySelector("pre")
+        !editor.querySelector(structureSelector)
     );
 }
 

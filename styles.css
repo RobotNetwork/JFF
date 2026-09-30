@@ -78,17 +78,6 @@ header span {
     color: var(--accent);
 }
 
-.header-actions button:disabled {
-    border-color: var(--border);
-    color: var(--muted);
-    cursor: default;
-}
-
-.header-actions button:disabled:hover {
-    border-color: var(--border);
-    color: var(--muted);
-}
-
 main {
     flex: 1;
     display: grid;
@@ -135,6 +124,22 @@ main {
 .toolbar button:hover {
     border-color: var(--accent);
     color: var(--accent);
+}
+
+/*
+ * Only the Clear button is ever disabled: it has nothing to do on an empty
+ * entry. It is the one toolbar control whose state the user cannot infer from
+ * the caret, so it stays muted rather than hoverable.
+ */
+.toolbar button:disabled {
+    border-color: var(--border);
+    color: var(--muted);
+    cursor: default;
+}
+
+.toolbar button:disabled:hover {
+    border-color: var(--border);
+    color: var(--muted);
 }
 
 .toolbar button[aria-pressed="true"] {
