@@ -16,6 +16,31 @@
     --mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
 }
 
+/*
+ * The dark palette is the default, and the light one is the same set of
+ * roles for a reader whose system asks for light. Both are declared here so
+ * nothing below this block names a colour that has to change with them.
+ */
+@media (prefers-color-scheme: light) {
+    :root {
+        color-scheme: light;
+        --bg: #f6f7f9;
+        --panel: #ffffff;
+        --border: #dcdfe4;
+        --border-strong: #9aa1ab;
+        --text: #1c1f24;
+        --accent: #1a7f37;
+        --accent-ink: #ffffff;
+        --code-bg: #f0f2f5;
+        --danger: #b3261e;
+        --muted: #5b636d;
+    }
+
+    .dropdown-menu {
+        box-shadow: 0 6px 16px rgb(0 0 0 / 18%);
+    }
+}
+
 * {
     box-sizing: border-box;
 }
@@ -62,8 +87,18 @@ header span {
  */
 .header-actions {
     display: flex;
+    align-items: center;
     gap: 6px;
     margin-left: auto;
+}
+
+/*
+ * A refusal to store the entry is the one thing in the header the user has
+ * to act on, so it carries the danger colour rather than the muted grey.
+ */
+.save-state {
+    color: var(--danger);
+    font-size: 13px;
 }
 
 .header-actions button {
@@ -135,9 +170,9 @@ main {
 }
 
 /*
- * Only the Clear button is ever disabled: it has nothing to do on an empty
- * entry. It is the one toolbar control whose state the user cannot infer from
- * the caret, so it stays muted rather than hoverable.
+ * Clear, Restore, Undo and Redo are the controls whose state the user cannot
+ * infer from the caret: nothing to clear, nothing to restore, nothing to undo.
+ * They stay muted rather than hoverable.
  */
 .toolbar button:disabled {
     border-color: var(--border);
@@ -167,6 +202,21 @@ main {
     width: 1px;
     margin: 2px 4px;
     background: var(--border);
+}
+
+/*
+ * Sits between the toolbar and the editor, where a paste that lost something
+ * is closest to the work. The accent edge marks it as a report rather than a
+ * warning about the entry itself.
+ */
+.notice {
+    margin: 0;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    background: var(--panel);
+    color: var(--text);
+    font-size: 13px;
 }
 
 .dropdown {
@@ -308,7 +358,8 @@ main {
 .output-head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
     padding: 8px 12px;
     border-bottom: 1px solid var(--border);
     background: var(--panel);
@@ -316,27 +367,79 @@ main {
     font-size: 13px;
 }
 
-.output-head button {
-    /* Sized for the longest label, so the flash to "Copied!" or "Copy
-       failed" does not move the button or the row around it. */
-    min-width: 6.5rem;
+.output-info {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-width: 0;
+}
+
+/*
+ * The count is read against a limit, so its digits keep one width and the
+ * row does not shuffle as the entry grows.
+ */
+.output-stats {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Past the journal field's length the paste is cut short, so this warns. */
+.output-stats.is-over {
+    color: var(--danger);
+    font-weight: 600;
+}
+
+.output-actions {
+    display: flex;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.output-actions button {
     padding: 5px 12px;
-    border: none;
+    border: 1px solid transparent;
     border-radius: 4px;
-    background: var(--accent);
-    color: var(--accent-ink);
     font-family: inherit;
     font-size: 13px;
-    font-weight: 600;
     cursor: pointer;
 }
 
-.output-head button:hover {
+/* Wrap is a toggle beside the primary action, so it keeps the quiet toolbar
+   look rather than taking the accent fill. */
+#wrapBtn {
+    border-color: var(--border-strong);
+    background: transparent;
+    color: var(--text);
+}
+
+#wrapBtn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+#wrapBtn[aria-pressed="true"] {
+    border-color: var(--accent);
+    background: rgb(from var(--accent) r g b / 0.18);
+    color: var(--accent);
+}
+
+#copyBtn {
+    /* Sized for the longest label, so the flash to "Copied!" or "Copy
+       failed" does not move the button or the row around it. */
+    min-width: 6.5rem;
+    border: none;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 600;
+}
+
+#copyBtn:hover {
     filter: brightness(1.1);
 }
 
-.output-head button:disabled,
-.output-head button:disabled:hover {
+#copyBtn:disabled,
+#copyBtn:disabled:hover {
     background: transparent;
     box-shadow: inset 0 0 0 1px var(--border);
     color: var(--muted);
@@ -344,13 +447,14 @@ main {
     filter: none;
 }
 
-.output-head button.error {
+#copyBtn.error {
     background: var(--danger);
     color: #fff;
 }
+
 #output {
     flex: 1;
-    overflow-y: auto;
+    overflow: auto;
     margin: 0;
     padding: 16px 20px;
     background: var(--code-bg);
@@ -364,27 +468,74 @@ main {
     overflow-wrap: anywhere;
 }
 
+/* Wrapping is the default; unwrapped is for reading the shape of a long line. */
+#output.nowrap {
+    white-space: pre;
+    overflow-wrap: normal;
+}
+
 /*
  * The hint is a pseudo-element, so the pane still reads as empty text: Copy
- * has nothing to take and the live region has nothing to announce.
+ * has nothing to take and the counter has nothing to show.
  */
 #output.is-empty::before {
     content: attr(data-empty);
     color: var(--muted);
 }
 
+/* ---------- View tabs ---------- */
+
+/*
+ * The tabs exist for the narrow layout and are hidden everywhere else, where
+ * both panes are on screen at once and there is nothing to choose between.
+ */
+.view-tabs {
+    display: none;
+    gap: 4px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+}
+
+.view-tabs button {
+    flex: 1;
+    padding: 5px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.view-tabs button[aria-current="true"] {
+    border-color: var(--accent);
+    background: rgb(from var(--accent) r g b / 0.18);
+    color: var(--accent);
+}
+
+/*
+ * One pane at a time. A phone keyboard leaves too little of a 50/50 split to
+ * show either pane, so the other one is hidden rather than shrunk.
+ */
 @media (max-width: 800px) {
+    .view-tabs {
+        display: flex;
+    }
+
     main {
         grid-template-columns: 1fr;
-        grid-template-rows: 1fr 1fr;
+        grid-template-rows: 1fr;
+    }
+
+    main[data-view="editor"] #outputPane,
+    main[data-view="output"] #editorPane {
+        display: none;
     }
 
     .pane {
         border-right: none;
-        border-bottom: 1px solid var(--border);
-    }
-
-    .pane:last-child {
         border-bottom: none;
     }
 }
@@ -458,9 +609,14 @@ main {
     font-size: 13px;
 }
 
+/*
+ * The border colour alone is what hover does, so focus adds a ring: a
+ * keyboard user has to be able to see where the typing will land.
+ */
 .link-form input:focus {
     border-color: var(--accent);
-    outline: none;
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
 }
 
 .link-error {
@@ -502,6 +658,27 @@ main {
 .dialog-actions .primary:hover {
     color: var(--accent-ink);
     filter: brightness(1.1);
+}
+
+/*
+ * Remove link is destructive and sits apart from Cancel and Insert, which
+ * stay together on the right.
+ */
+.dialog-actions .danger {
+    margin-right: auto;
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.dialog-actions .danger:hover {
+    border-color: var(--danger);
+    background: rgb(from var(--danger) r g b / 0.12);
+    color: var(--danger);
+}
+
+/* The rule above outranks the user agent's display:none for [hidden]. */
+.dialog-actions button[hidden] {
+    display: none;
 }
 
 /* ---------- Keyboard shortcut reference ---------- */

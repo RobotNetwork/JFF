@@ -1,7 +1,16 @@
 const editor = document.getElementById("editor");
 const output = document.getElementById("output");
 const copyBtn = document.getElementById("copyBtn");
+const wrapBtn = document.getElementById("wrapBtn");
+const outputStats = document.getElementById("outputStats");
 const toolbar = document.getElementById("toolbar");
+const undoBtn = document.getElementById("undoBtn");
+const redoBtn = document.getElementById("redoBtn");
+const restoreBtn = document.getElementById("restoreBtn");
+const notice = document.getElementById("notice");
+const saveState = document.getElementById("saveState");
+const mainEl = document.querySelector("main");
+const viewTabs = [...document.querySelectorAll(".view-tabs button")];
 const headingToggle = document.getElementById("headingToggle");
 const headingMenu = document.getElementById("headingMenu");
 const linkDialog = document.getElementById("linkDialog");
@@ -11,6 +20,7 @@ const linkText = document.getElementById("linkText");
 const linkTextRow = document.getElementById("linkTextRow");
 const linkError = document.getElementById("linkError");
 const linkCancel = document.getElementById("linkCancel");
+const linkRemove = document.getElementById("linkRemove");
 const clearBtn = document.getElementById("clearBtn");
 const shortcutBtn = document.getElementById("shortcutBtn");
 const shortcutsDialog = document.getElementById("shortcutsDialog");
@@ -346,6 +356,25 @@ function queryCommandState(cmd) {
  * command has no pressed state to show.
  */
 const commands = {
+    /*
+     * Undo and redo walk the snapshot stack rather than running a document
+     * command: the browser's own history does not survive setting innerHTML,
+     * which is what restoring a snapshot does.
+     */
+    undo: {
+        run: () => {
+            restore(-1);
+
+            return false;
+        },
+    },
+    redo: {
+        run: () => {
+            restore(1);
+
+            return false;
+        },
+    },
     bold: {
         run: () => execCommand("bold"),
         isActive: () => queryCommandState("bold"),
@@ -399,6 +428,25 @@ const commands = {
         isActive: (value, element) => Boolean(element.closest("a")),
     },
     removeFormat: { run: () => execCommand("removeFormat") },
+    /*
+     * Neither of these changes the entry. They are commands so the shortcut
+     * table can name them, which is what puts them in the reference dialog,
+     * and their buttons live outside the toolbar the table drives.
+     */
+    help: {
+        run: () => {
+            openShortcutsDialog();
+
+            return true;
+        },
+    },
+    copyOutput: {
+        run: () => {
+            copyOutput();
+
+            return true;
+        },
+    },
 };
 
 /*
@@ -426,8 +474,7 @@ function checkCommandCoverage() {
     }
 
     for (const { cmd } of editingShortcuts) {
-        /* Undo and redo walk the snapshot stack in the key handler instead. */
-        if (!commands[cmd] && cmd !== "undo" && cmd !== "redo") {
+        if (!commands[cmd]) {
             throw new Error(`Shortcut names no command: ${cmd}`);
         }
     }
@@ -506,6 +553,25 @@ function wrapInlineCode() {
     selection.addRange(selectedRange);
 }
 
+/* The link an element sits in, or null. */
+function linkAt(node) {
+    const element = closestElement(node);
+    const anchor = element ? element.closest("a") : null;
+
+    return anchor && editor.contains(anchor) ? anchor : null;
+}
+
+/*
+ * The link the command was invoked on, when the whole selection sits inside
+ * one. That link is being edited or removed rather than a second one being
+ * inserted beside it.
+ */
+function linkInRange(range) {
+    const anchor = linkAt(range.startContainer);
+
+    return anchor && anchor === linkAt(range.endContainer) ? anchor : null;
+}
+
 /*
  * The dialog takes focus, and both createLink and the caret restore need the
  * selection the command was invoked on, so the range is cloned up front and
@@ -524,7 +590,7 @@ function insertLink() {
 
     if (!source) return false;
 
-    openLinkDialog(source.cloneRange());
+    openLinkDialog(source.cloneRange(), linkInRange(source));
 
     return true;
 }
@@ -532,9 +598,10 @@ function insertLink() {
 /* ---------- Link dialog ---------- */
 
 /*
- * The link being built while the dialog is open. Null outside it. The range
- * is the cloned selection, and href stays empty until the form is submitted,
- * which is what separates a confirmed link from a cancelled one.
+ * The link being built or edited while the dialog is open. Null outside it.
+ * The range is the cloned selection, editing is the link the command was run
+ * on, and href stays empty until the form is submitted, which is what
+ * separates a confirmed link from a cancelled one.
  */
 let pendingLink = null;
 
@@ -546,18 +613,34 @@ let pendingLink = null;
  */
 let backdropPress = false;
 
-function openLinkDialog(range) {
-    pendingLink = { range, collapsed: range.collapsed, href: "", text: "" };
+function openLinkDialog(range, anchor) {
+    const href = anchor ? normalizeHref(anchor.getAttribute("href") || "") : "";
+
+    pendingLink = {
+        range,
+        collapsed: range.collapsed,
+        editing: anchor,
+        remove: false,
+        href: "",
+        text: "",
+    };
 
     linkError.hidden = true;
-    linkUrl.value = "";
+    linkUrl.value = href;
     linkText.value = "";
 
     /* An existing selection already supplies the link text. */
     linkTextRow.hidden = !range.collapsed;
 
+    /* There is only something to remove when a link was run on. */
+    linkRemove.hidden = !anchor;
+
     linkDialog.showModal();
     linkUrl.focus();
+
+    /* The caret lands after the URL rather than on all of it, so a correction
+       does not start by wiping the value. */
+    linkUrl.setSelectionRange(href.length, href.length);
 }
 
 function restoreLinkSelection(range) {
@@ -567,6 +650,17 @@ function restoreLinkSelection(range) {
 
     selection.removeAllRanges();
     selection.addRange(range);
+}
+
+/*
+ * Removing a link keeps the text it held. The range the dialog was opened
+ * with points into the children, which survive the unwrap, so the caret is
+ * already sitting where the link was.
+ */
+function removeLink(anchor) {
+    if (!anchor || !anchor.isConnected) return;
+
+    anchor.replaceWith(...anchor.childNodes);
 }
 
 function closeLinkDialog() {
@@ -598,6 +692,15 @@ linkForm.addEventListener("submit", (event) => {
 
 linkCancel.addEventListener("click", closeLinkDialog);
 
+/* Removal is a decision of its own, so it leaves through the same close path
+   as Insert rather than sharing the form's submit validation. */
+linkRemove.addEventListener("click", () => {
+    if (!pendingLink) return;
+
+    pendingLink.remove = true;
+    closeLinkDialog();
+});
+
 linkDialog.addEventListener("pointerdown", (event) => {
     backdropPress = event.target === linkDialog;
 });
@@ -624,7 +727,30 @@ linkDialog.addEventListener("close", () => {
 
     restoreLinkSelection(pending.range);
 
+    if (pending.remove) {
+        removeLink(pending.editing);
+
+        queueSnapshot();
+        render();
+        updateToolbarState();
+        return;
+    }
+
     if (!pending.href) return;
+
+    /*
+     * A caret inside a link edits that link's URL. createLink would wrap the
+     * caret's text in a second link instead, since there is nothing for it to
+     * turn into a link.
+     */
+    if (pending.editing && pending.collapsed) {
+        pending.editing.setAttribute("href", pending.href);
+
+        queueSnapshot();
+        render();
+        updateToolbarState();
+        return;
+    }
 
     if (pending.collapsed) {
         const text = pending.text || pending.href;
@@ -661,8 +787,6 @@ const extraShortcuts = [
     },
 ];
 
-const shortcutLabels = { undo: "Undo", redo: "Redo" };
-
 /* A code names the physical key, which is not the character it produces. */
 const chordKeys = {
     Digit1: "1",
@@ -676,18 +800,19 @@ const chordKeys = {
     Backquote: "`",
     Backslash: "\\",
     Period: ">",
+    Slash: "/",
 };
 
 function shortcutName(shortcut) {
     const selector = shortcut.val
         ? `button[data-cmd="${shortcut.cmd}"][data-val="${shortcut.val}"]`
         : `button[data-cmd="${shortcut.cmd}"]:not([data-val])`;
-    const button = toolbar.querySelector(selector);
+    /* Copy and Help sit outside the toolbar, so the search is not limited to
+       it; the label on whichever button runs the command is its name. */
+    const button = document.querySelector(selector);
 
     return (
-        (button && button.getAttribute("aria-label")) ||
-        shortcutLabels[shortcut.cmd] ||
-        shortcut.cmd
+        (button && button.getAttribute("aria-label")) || shortcut.cmd
     );
 }
 
@@ -766,11 +891,23 @@ function buildTooltips() {
     const undo = chordLabel(shortcutFor("undo"));
 
     clearBtn.title = `${clearLabel} and start again (${undo} to undo)`;
+
+    /*
+     * Restore keeps what it replaces, so the cleared entry and the current
+     * one swap places rather than one of them being lost.
+     */
+    restoreBtn.title = `${restoreBtn.getAttribute("aria-label")} (the two entries swap)`;
 }
 
-shortcutBtn.addEventListener("click", () => {
-    shortcutsDialog.showModal();
-});
+/*
+ * showModal throws on a dialog that is already open, and the chord and the
+ * button both arrive here, so the open state is checked rather than assumed.
+ */
+function openShortcutsDialog() {
+    if (!shortcutsDialog.open) shortcutsDialog.showModal();
+}
+
+shortcutBtn.addEventListener("click", openShortcutsDialog);
 
 shortcutsClose.addEventListener("click", () => {
     shortcutsDialog.close();
@@ -817,7 +954,80 @@ function updateToolbarState() {
      * and the selection would read as no heading at all.
      */
     if (headingMenu.hidden) updateHeadingControl();
+
+    updateHistoryButtons();
+
+    /* Last, and after the history buttons: a disabled control cannot hold the
+       toolbar's tab stop. */
+    syncToolbarTabStops();
 }
+
+/*
+ * The two controls the toolbar reads from the snapshot stack rather than from
+ * the caret. A pending debounced snapshot is not in the stack yet, but
+ * flushing it would add one, so undo counts it.
+ */
+function updateHistoryButtons() {
+    undoBtn.disabled = undoIndex <= 0 && !undoTimer;
+    redoBtn.disabled = undoIndex >= undoStack.length - 1;
+}
+
+/*
+ * A toolbar is one tab stop rather than a dozen: the arrows move between its
+ * controls and Tab leaves it, which is what role="toolbar" promises. The
+ * heading menu's items are reached with the arrows from the toggle, so they
+ * are not part of this ring.
+ */
+function toolbarControls() {
+    return [...toolbar.querySelectorAll("button")].filter(
+        (button) => !button.closest(".dropdown-menu"),
+    );
+}
+
+function enabledToolbarControls() {
+    return toolbarControls().filter((button) => !button.disabled);
+}
+
+function syncToolbarTabStops() {
+    const controls = toolbarControls();
+    const enabled = enabledToolbarControls();
+    const stop = enabled.find((button) => button.tabIndex === 0) ?? enabled[0];
+
+    for (const button of controls) {
+        button.tabIndex = button === stop ? 0 : -1;
+    }
+}
+
+toolbar.addEventListener("keydown", (event) => {
+    /* The heading menu runs its own arrow handling. */
+    if (event.target.closest(".dropdown-menu")) return;
+
+    const step =
+        event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    const edge =
+        event.key === "Home"
+            ? "first"
+            : event.key === "End"
+              ? "last"
+              : "";
+
+    if (!step && !edge) return;
+
+    const controls = enabledToolbarControls();
+    const index = controls.indexOf(document.activeElement);
+
+    if (index === -1) return;
+
+    event.preventDefault();
+
+    const next = edge
+        ? edge === "first"
+            ? controls[0]
+            : controls[controls.length - 1]
+        : controls[(index + step + controls.length) % controls.length];
+
+    next.focus();
+});
 
 /* ---------- Heading dropdown ---------- */
 
@@ -1577,6 +1787,8 @@ const editingShortcuts = [
     { key: "z", cmd: "undo" },
     { key: "y", cmd: "redo" },
     { key: "z", shift: true, cmd: "redo" },
+    { key: "c", alt: true, cmd: "copyOutput" },
+    { code: "Slash", cmd: "help" },
 ];
 
 function matchesShortcut(shortcut, event) {
@@ -1968,15 +2180,6 @@ editor.addEventListener("keydown", (event) => {
     if (!shortcut) return;
 
     event.preventDefault();
-
-    /*
-     * Undo and redo walk the snapshot stack instead of running a document
-     * command, so they own the rest of the handler.
-     */
-    if (shortcut.cmd === "undo" || shortcut.cmd === "redo") {
-        restore(shortcut.cmd === "undo" ? -1 : 1);
-        return;
-    }
 
     flushSnapshot();
 
@@ -2459,6 +2662,13 @@ function updatePlaceholder() {
  * the rules a paste is held to, whether or not it came from one.
  */
 const storageKey = "jff.entry.v1";
+
+/*
+ * The entry that the last Clear replaced. Clearing is a content change and
+ * undo brings it back, but only until the next thing typed replaces the
+ * entry, so the one that was cleared is kept beside it as well.
+ */
+const previousKey = "jff.entry.previous.v1";
 const saveDelay = 400;
 
 let saveTimer = null;
@@ -2472,18 +2682,31 @@ function storageAvailable() {
     }
 }
 
+/* Says so rather than leaving the entry to be lost silently at the reload. */
+function setSaveState(failed) {
+    saveState.hidden = !failed;
+}
+
 function saveEntry() {
     if (saveTimer) {
         clearTimeout(saveTimer);
         saveTimer = null;
     }
 
-    if (!storageAvailable()) return;
+    if (!storageAvailable()) {
+        setSaveState(true);
+        return;
+    }
 
     try {
         window.localStorage.setItem(storageKey, editor.innerHTML);
+        setSaveState(false);
     } catch {
-        /* A full or read-only store is not worth interrupting the edit for. */
+        /*
+         * A full or read-only store is not worth interrupting the edit for,
+         * but it does mean the entry is not being kept.
+         */
+        setSaveState(true);
     }
 }
 
@@ -2503,14 +2726,11 @@ function flushSave() {
 }
 
 function restoreEntry() {
-    const stored = readStoredEntry();
+    const stored = readStoredEntry(storageKey);
 
     if (!stored) return false;
 
-    const doc = new DOMParser().parseFromString(stored, "text/html");
-
-    sanitizeRichText(doc);
-    wrapOrphanListItems(doc.body);
+    const doc = parseStoredEntry(stored);
 
     if (doc.body.textContent.trim() === "" && !doc.body.querySelector("pre")) {
         return false;
@@ -2522,37 +2742,95 @@ function restoreEntry() {
 }
 
 /*
+ * Anything out of storage goes through the clipboard rules whether or not it
+ * came from a clipboard: an entry written by an older build, or one a drop
+ * put there, is held to the rules a paste is held to.
+ */
+function parseStoredEntry(stored) {
+    const doc = new DOMParser().parseFromString(stored, "text/html");
+
+    sanitizeRichText(doc);
+    wrapOrphanListItems(doc.body);
+
+    return doc;
+}
+
+/*
  * Storage is read through the same guard as the write, so a browser that
  * refuses the property simply starts with an empty editor.
  */
-function readStoredEntry() {
+function readStoredEntry(key) {
     if (!storageAvailable()) return "";
 
     try {
-        return window.localStorage.getItem(storageKey) || "";
+        return window.localStorage.getItem(key) || "";
     } catch {
         return "";
     }
 }
 
+function storePrevious(html) {
+    if (!storageAvailable()) return;
+
+    try {
+        window.localStorage.setItem(previousKey, html);
+    } catch {
+        /* As in saveEntry: a store that refuses the write is not the edit's
+           problem, and the entry in the editor is untouched by the failure. */
+    }
+}
+
+/* An empty slot is the one state where the button has nothing to do. */
+function updateRestoreButton() {
+    restoreBtn.disabled = readStoredEntry(previousKey) === "";
+}
+
 /*
  * Clearing is a content change like any other, so it goes through the undo
- * stack rather than past it: the entry is recoverable with Ctrl+Z.
+ * stack rather than past it: the entry is recoverable with Ctrl+Z. It is put
+ * beside the entry as well, so it is still there after the undo window.
  */
 function clearEntry() {
     if (editorIsEmpty()) return;
 
     flushSnapshot();
+    storePrevious(editor.innerHTML);
 
     editor.innerHTML = "";
     commitSnapshot();
 
     render();
     updateToolbarState();
+    updateRestoreButton();
+    editor.focus();
+}
+
+/*
+ * The cleared entry and the current one change places, so the button is its
+ * own undo: a second press puts back what the first one replaced.
+ */
+function restorePrevious() {
+    const stored = readStoredEntry(previousKey);
+
+    if (!stored) return;
+
+    flushSnapshot();
+
+    const current = editor.innerHTML;
+
+    editor.innerHTML = parseStoredEntry(stored).body.innerHTML;
+    storePrevious(current);
+
+    commitSnapshot();
+
+    render();
+    updateToolbarState();
+    updateRestoreButton();
     editor.focus();
 }
 
 clearBtn.addEventListener("click", clearEntry);
+restoreBtn.addEventListener("click", restorePrevious);
 
 document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") flushSave();
@@ -2922,6 +3200,40 @@ function tidyProse(text) {
         .replace(/\n{3,}/g, "\n\n");
 }
 
+/* ---------- Output size ---------- */
+
+/*
+ * The length of the entry as it will be pasted. A journal field is a
+ * multi-line text field and is cut at its own length, and ServiceNow's own
+ * guidance is to show how much room is left rather than let a paste be
+ * truncated. Instances differ, so the length is one constant.
+ */
+const journalCharLimit = 4000;
+
+function updateOutputStats(body) {
+    if (body === "") {
+        outputStats.textContent = "";
+        outputStats.classList.remove("is-over");
+        outputStats.title = "";
+        return;
+    }
+
+    const lines = body.split("\n").length;
+    const over = body.length > journalCharLimit;
+
+    outputStats.textContent =
+        `${body.length.toLocaleString()} / ${journalCharLimit.toLocaleString()} chars` +
+        ` · ${lines.toLocaleString()} ${lines === 1 ? "line" : "lines"}`;
+
+    outputStats.classList.toggle("is-over", over);
+
+    outputStats.title = over
+        ? `Over the ${journalCharLimit.toLocaleString()} character limit by ${(
+              body.length - journalCharLimit
+          ).toLocaleString()}`
+        : "";
+}
+
 function render() {
     /*
      * Blank lines at either end come from an empty first or last block and
@@ -2940,6 +3252,8 @@ function render() {
     output.classList.toggle("is-empty", body === "");
     copyBtn.disabled = body === "";
 
+    updateOutputStats(body);
+
     /*
      * render() is the one hook every content change already runs, so the
      * placeholder, the Clear button and the saved entry are refreshed here
@@ -2950,59 +3264,194 @@ function render() {
     queueSave();
 }
 
-/* ---------- Paste handling ---------- */
+/* ---------- Paste and drop ---------- */
+
+/*
+ * Elements whose content the editor cannot hold. They are removed rather than
+ * unwrapped, so they leave nothing behind to notice afterwards, which is why
+ * a paste that was only a screenshot has to be reported as it happens.
+ */
+const droppedMediaSelector =
+    "img, svg, iframe, video, audio, canvas, object, embed";
+
+const noticeDelay = 5000;
+
+let noticeTimer = null;
+
+function showNotice(message) {
+    clearTimeout(noticeTimer);
+
+    notice.textContent = message;
+    notice.hidden = false;
+
+    noticeTimer = setTimeout(() => {
+        noticeTimer = null;
+        notice.hidden = true;
+    }, noticeDelay);
+}
+
+/*
+ * Rich clipboard HTML as editor content. Reports how much of it held a
+ * picture, and whether anything was left to insert: clipboard HTML can carry
+ * structure but no content - a lone <meta> tag, or an image the sanitizer
+ * drops, which is the payload a screenshot paste arrives as.
+ */
+function insertRichText(html) {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+
+    /* Counted before sanitizing, which removes these elements outright. */
+    const dropped = doc.body.querySelectorAll(droppedMediaSelector).length;
+
+    /*
+     * Clipboard metadata varies between editors and versions, and every
+     * editor that is not a Microsoft one still carries formatting as inline
+     * styles, so the whole path runs for all rich HTML.
+     */
+    normalizeInlineStyles(doc);
+
+    sanitizeRichText(doc);
+
+    wrapOrphanListItems(doc.body);
+
+    normalizeRichTextWhitespace(doc.body);
+
+    if (doc.body.textContent.trim() === "") {
+        return { inserted: false, dropped };
+    }
+
+    insertHtmlAtCursor(doc.body.innerHTML);
+
+    return { inserted: true, dropped };
+}
+
+function reportDropped(media, files) {
+    const parts = [];
+
+    if (media) parts.push(`${media} image${media === 1 ? "" : "s"}`);
+    if (files) parts.push(`${files} file${files === 1 ? "" : "s"}`);
+
+    if (parts.length === 0) return;
+
+    showNotice(`${parts.join(" and ")} dropped: entries hold text only.`);
+}
+
+/*
+ * One path for both ways content arrives, because a drop carries the same
+ * DataTransfer a paste does. A drop used to reach the editor with no
+ * sanitizer behind it at all: the browser inserted whatever was dragged, and
+ * the editor then showed formatting the output could never carry.
+ */
+function insertClipboard(dataTransfer) {
+    const html = dataTransfer.getData("text/html");
+    let dropped = 0;
+
+    if (html) {
+        const result = insertRichText(html);
+
+        dropped = result.dropped;
+
+        if (result.inserted) {
+            normalizeCodeBlocks(editor);
+            reportDropped(dropped, 0);
+            return;
+        }
+    }
+
+    const text = dataTransfer.getData("text/plain");
+
+    if (text) {
+        if (looksLikeMarkdown(text)) {
+            insertHtmlAtCursor(markdownToHtml(text));
+        } else {
+            insertHtmlAtCursor(escapeHtml(text).replace(/\r?\n/g, "<br>"));
+        }
+
+        normalizeCodeBlocks(editor);
+        reportDropped(dropped, 0);
+        return;
+    }
+
+    /* Nothing to insert, so what was dropped is all there is to report. */
+    reportDropped(dropped, dataTransfer.files ? dataTransfer.files.length : 0);
+}
 
 editor.addEventListener("paste", (event) => {
     event.preventDefault();
     flushSnapshot();
 
-    const clipboard = event.clipboardData;
-    const html = clipboard.getData("text/html");
+    insertClipboard(event.clipboardData);
+});
 
-    if (html) {
-        const doc = new DOMParser().parseFromString(
-            html,
-            "text/html",
-        );
+/* ---------- Drop handling ---------- */
 
-        /*
-         * Clipboard metadata varies between editors and versions, and every
-         * editor that is not a Microsoft one still carries formatting as
-         * inline styles, so the whole path runs for all rich HTML.
-         */
-        normalizeInlineStyles(doc);
+/*
+ * Dragging a selection inside the editor raises dragstart here. That drag is
+ * the browser's own move, and it has to keep its default or the text would be
+ * copied to the drop point instead of moved.
+ */
+let draggingWithinEditor = false;
 
-        sanitizeRichText(doc);
+editor.addEventListener("dragstart", () => {
+    draggingWithinEditor = true;
+});
 
-        wrapOrphanListItems(doc.body);
+editor.addEventListener("dragend", () => {
+    draggingWithinEditor = false;
+});
 
-        normalizeRichTextWhitespace(doc.body);
+function draggableContent(dataTransfer) {
+    if (draggingWithinEditor || !dataTransfer) return false;
 
-        /*
-         * Clipboard HTML can carry structure but no content - a lone <meta>
-         * tag, or an image the sanitizer drops - so an empty body falls
-         * through to the text/plain branch instead of pasting nothing.
-         */
-        if (doc.body.textContent.trim() !== "") {
-            insertHtmlAtCursor(doc.body.innerHTML);
-            normalizeCodeBlocks(editor);
-            return;
-        }
+    /* getData is empty during a drag, so the types are what says a drop is
+       worth taking. */
+    return dataTransfer.types.length > 0 || dataTransfer.files.length > 0;
+}
+
+/*
+ * The caret the browser is showing at the drop point. A drop does not move
+ * the selection on its own, and the insert has to land where the pointer is
+ * rather than wherever the caret was left.
+ */
+function rangeFromPoint(event) {
+    const position = document.caretPositionFromPoint
+        ? document.caretPositionFromPoint(event.clientX, event.clientY)
+        : null;
+
+    if (position) {
+        const range = document.createRange();
+
+        range.setStart(position.offsetNode, position.offset);
+        range.collapse(true);
+
+        return range;
     }
 
-    const text = clipboard.getData("text/plain");
+    return document.caretRangeFromPoint
+        ? document.caretRangeFromPoint(event.clientX, event.clientY)
+        : null;
+}
 
-    if (!text) return;
+editor.addEventListener("dragover", (event) => {
+    /* Without this the browser refuses the drop and inserts nothing. */
+    if (draggableContent(event.dataTransfer)) event.preventDefault();
+});
 
-    if (looksLikeMarkdown(text)) {
-        insertHtmlAtCursor(markdownToHtml(text));
-    } else {
-        insertHtmlAtCursor(
-            escapeHtml(text).replace(/\r?\n/g, "<br>"),
-        );
+editor.addEventListener("drop", (event) => {
+    if (!draggableContent(event.dataTransfer)) return;
+
+    event.preventDefault();
+    flushSnapshot();
+
+    const point = rangeFromPoint(event);
+
+    if (point && editor.contains(point.startContainer)) {
+        const selection = window.getSelection();
+
+        selection.removeAllRanges();
+        selection.addRange(point);
     }
 
-    normalizeCodeBlocks(editor);
+    insertClipboard(event.dataTransfer);
 });
 
 /* ---------- Helpers ---------- */
@@ -3152,7 +3601,11 @@ function copyViaExecCommand(text) {
     return copied;
 }
 
-copyBtn.addEventListener("click", async () => {
+/*
+ * Reached by the button and by the chord, so the copy itself is not the
+ * button's handler.
+ */
+async function copyOutput() {
     const text = output.textContent;
 
     let copied = false;
@@ -3169,7 +3622,50 @@ copyBtn.addEventListener("click", async () => {
     if (!copied) copied = copyViaExecCommand(text);
 
     flashCopyLabel(copied ? "Copied!" : "Copy failed", !copied);
+}
+
+copyBtn.addEventListener("click", copyOutput);
+
+/* ---------- Output wrap ---------- */
+
+/*
+ * Wrapping is the default, because a journal entry rarely holds a line long
+ * enough to need scrolling. Turning it off is how the shape of a long code
+ * line gets read, so the choice is the reader's and lasts the session.
+ */
+function setOutputWrap(wrapped) {
+    wrapBtn.setAttribute("aria-pressed", String(wrapped));
+    output.classList.toggle("nowrap", !wrapped);
+}
+
+wrapBtn.addEventListener("click", () => {
+    setOutputWrap(wrapBtn.getAttribute("aria-pressed") !== "true");
 });
+
+/* ---------- View tabs ---------- */
+
+/*
+ * A narrow window shows one pane at a time. The stylesheet does the hiding,
+ * so this only records which one is chosen and keeps focus out of the pane
+ * that has just gone.
+ */
+function setView(view) {
+    mainEl.dataset.view = view;
+
+    for (const tab of viewTabs) {
+        tab.setAttribute("aria-current", String(tab.dataset.view === view));
+    }
+
+    if (document.activeElement && !document.activeElement.offsetParent) {
+        const tab = viewTabs.find((button) => button.dataset.view === view);
+
+        if (tab) tab.focus();
+    }
+}
+
+for (const tab of viewTabs) {
+    tab.addEventListener("click", () => setView(tab.dataset.view));
+}
 
 /*
  * Formatting commands are captured as tags rather than as inline styles: the
@@ -3190,6 +3686,7 @@ buildShortcutList();
  * place before the first snapshot is taken.
  */
 restoreEntry();
+updateRestoreButton();
 
 commitSnapshot();
 render();

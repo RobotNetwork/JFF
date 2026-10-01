@@ -20,9 +20,18 @@
             <span>Rich text → ServiceNow journal [code] markup</span>
 
             <div class="header-actions">
+                <!--
+                    Shown only when the browser refuses to store the entry, so
+                    the app never claims to be keeping something it is not.
+                -->
+                <span id="saveState" class="save-state" role="status" hidden>
+                    Not saved
+                </span>
+
                 <button
                     type="button"
                     id="shortcutBtn"
+                    data-cmd="help"
                     aria-label="Keyboard shortcuts"
                     aria-haspopup="dialog"
                 >
@@ -31,14 +40,52 @@
             </div>
         </header>
 
-        <main>
-            <div class="pane">
+        <!--
+            Only shown on a narrow screen, where one pane at a time is more
+            usable than a 50/50 split under a phone keyboard. The buttons
+            mark the view in use rather than prescribing a tab panel, and the
+            stylesheet does the hiding.
+        -->
+        <nav class="view-tabs" id="viewTabs" role="group" aria-label="Pane">
+            <button
+                type="button"
+                data-view="editor"
+                aria-current="true"
+            >
+                Editor
+            </button>
+
+            <button type="button" data-view="output">Output</button>
+        </nav>
+
+        <main data-view="editor">
+            <div class="pane" id="editorPane">
                 <div
                     class="toolbar"
                     id="toolbar"
                     role="toolbar"
                     aria-label="Text formatting"
                 >
+                    <button
+                        type="button"
+                        id="undoBtn"
+                        data-cmd="undo"
+                        aria-label="Undo"
+                    >
+                        ↶
+                    </button>
+
+                    <button
+                        type="button"
+                        id="redoBtn"
+                        data-cmd="redo"
+                        aria-label="Redo"
+                    >
+                        ↷
+                    </button>
+
+                    <div class="sep"></div>
+
                     <button
                         type="button"
                         data-cmd="bold"
@@ -236,7 +283,23 @@
                     >
                         Clear
                     </button>
+
+                    <button
+                        type="button"
+                        id="restoreBtn"
+                        aria-label="Restore the entry you cleared"
+                        disabled
+                    >
+                        Restore
+                    </button>
                 </div>
+
+                <!--
+                    Reports content the editor cannot carry: a pasted image is
+                    removed by the sanitizer, and a paste that was only an image
+                    would otherwise look like nothing happened at all.
+                -->
+                <p class="notice" id="notice" role="status" hidden></p>
 
                 <div
                     id="editor"
@@ -249,17 +312,51 @@
                 ></div>
             </div>
 
-            <div class="pane">
+            <div class="pane" id="outputPane">
                 <div class="output-head">
-                    <span id="outputLabel">ServiceNow journal output</span>
-                    <button type="button" id="copyBtn" disabled>Copy</button>
+                    <div class="output-info">
+                        <span id="outputLabel">ServiceNow journal output</span>
+                        <!--
+                            Filled by render(). An entry that is pasted into a
+                            journal field is cut at the field's length, and the
+                            field gives no warning of its own.
+                        -->
+                        <span class="output-stats" id="outputStats"></span>
+                    </div>
+
+                    <div class="output-actions">
+                        <button
+                            type="button"
+                            id="wrapBtn"
+                            aria-label="Wrap long lines"
+                            aria-pressed="true"
+                        >
+                            Wrap
+                        </button>
+
+                        <button
+                            type="button"
+                            id="copyBtn"
+                            data-cmd="copyOutput"
+                            aria-label="Copy"
+                            disabled
+                        >
+                            Copy
+                        </button>
+                    </div>
                 </div>
 
+                <!--
+                    tabindex makes the pane reachable from the keyboard, and no
+                    live region: it is rewritten on every keystroke, and a
+                    screen reader announcing the whole entry each time is worse
+                    than making the user read what they want to hear.
+                -->
                 <pre
                     id="output"
                     data-empty="Markup appears here as you type."
-                    aria-live="polite"
                     aria-labelledby="outputLabel"
+                    tabindex="0"
                 ></pre>
             </div>
         </main>
@@ -298,6 +395,13 @@
                 </div>
 
                 <div class="dialog-actions">
+                    <!-- Shown only when the command was run on an existing
+                         link, which is the one case there is something to
+                         remove. -->
+                    <button type="button" id="linkRemove" class="danger" hidden>
+                        Remove link
+                    </button>
+
                     <button type="button" id="linkCancel">Cancel</button>
                     <button type="submit" class="primary">Insert</button>
                 </div>
