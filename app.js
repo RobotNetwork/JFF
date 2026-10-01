@@ -1,11 +1,8 @@
 const editor = document.getElementById("editor");
 const output = document.getElementById("output");
 const copyBtn = document.getElementById("copyBtn");
-const wrapBtn = document.getElementById("wrapBtn");
 const outputStats = document.getElementById("outputStats");
 const toolbar = document.getElementById("toolbar");
-const undoBtn = document.getElementById("undoBtn");
-const redoBtn = document.getElementById("redoBtn");
 const restoreBtn = document.getElementById("restoreBtn");
 const notice = document.getElementById("notice");
 const saveState = document.getElementById("saveState");
@@ -606,12 +603,31 @@ function insertLink() {
 let pendingLink = null;
 
 /*
- * A press that starts on the dialog rather than the form is a press on the
- * backdrop. Tracking it keeps a text selection dragged out of the URL field
- * from being read as a click outside, which would close the dialog and throw
- * the field away.
+ * A press that starts on the dialog box rather than on the form is a press on
+ * the backdrop: the box is transparent and unpadded, so anything between the
+ * form and the edge is backdrop. Tracking where the press began keeps a text
+ * selection dragged out of a field, or off the shortcut list, from being read
+ * as a click outside, which would close the dialog and throw the field away.
  */
-let backdropPress = false;
+function closeOnBackdrop(dialog, close) {
+    let pressed = false;
+
+    dialog.addEventListener("pointerdown", (event) => {
+        pressed = event.target === dialog;
+    });
+
+    dialog.addEventListener("click", (event) => {
+        if (pressed && event.target === dialog) close();
+
+        pressed = false;
+    });
+
+    /* Escape and the dialog's own buttons close it too, and a press that was
+       in flight when they did must not be judged later. */
+    dialog.addEventListener("close", () => {
+        pressed = false;
+    });
+}
 
 function openLinkDialog(range, anchor) {
     const href = anchor ? normalizeHref(anchor.getAttribute("href") || "") : "";
@@ -701,15 +717,7 @@ linkRemove.addEventListener("click", () => {
     closeLinkDialog();
 });
 
-linkDialog.addEventListener("pointerdown", (event) => {
-    backdropPress = event.target === linkDialog;
-});
-
-linkDialog.addEventListener("click", (event) => {
-    if (backdropPress && event.target === linkDialog) closeLinkDialog();
-
-    backdropPress = false;
-});
+closeOnBackdrop(linkDialog, closeLinkDialog);
 
 /*
  * The dialog is already closed by the time this runs, whether it went
@@ -720,7 +728,6 @@ linkDialog.addEventListener("close", () => {
     const pending = pendingLink;
 
     pendingLink = null;
-    backdropPress = false;
     linkError.hidden = true;
 
     if (!pending) return;
@@ -776,15 +783,15 @@ linkDialog.addEventListener("close", () => {
  * button that runs the same command, so a command has one name.
  */
 const extraShortcuts = [
-    {
-        keys: "Tab",
-        label: "Indent a list item, or a tab inside a code block",
-    },
-    { keys: "Shift+Tab", label: "Outdent a list item, or clear one indent" },
-    {
-        keys: "Enter",
-        label: "Next list item, leave a code block or quote on an empty line, or step out of inline code",
-    },
+    // {
+    //     keys: "Tab",
+    //     label: "Indent a list item, or a tab inside a code block",
+    // },
+    // { keys: "Shift+Tab", label: "Outdent a list item, or clear one indent" },
+    // {
+    //     keys: "Enter",
+    //     label: "Next list item, leave a code block or quote on an empty line, or step out of inline code",
+    // },
 ];
 
 /* A code names the physical key, which is not the character it produces. */
@@ -803,7 +810,14 @@ const chordKeys = {
     Slash: "/",
 };
 
+/*
+ * The name of a shortcut: the label of the control that runs the same
+ * command, so a command has one name. A shortcut with no control - undo and
+ * redo - carries its own.
+ */
 function shortcutName(shortcut) {
+    if (shortcut.label) return shortcut.label;
+
     const selector = shortcut.val
         ? `button[data-cmd="${shortcut.cmd}"][data-val="${shortcut.val}"]`
         : `button[data-cmd="${shortcut.cmd}"]:not([data-val])`;
@@ -913,6 +927,8 @@ shortcutsClose.addEventListener("click", () => {
     shortcutsDialog.close();
 });
 
+closeOnBackdrop(shortcutsDialog, () => shortcutsDialog.close());
+
 /* ---------- Toolbar active state ---------- */
 
 function setButtonActive(button, active) {
@@ -955,21 +971,8 @@ function updateToolbarState() {
      */
     if (headingMenu.hidden) updateHeadingControl();
 
-    updateHistoryButtons();
-
-    /* Last, and after the history buttons: a disabled control cannot hold the
-       toolbar's tab stop. */
+    /* Last: a control that cannot be reached cannot hold the tab stop. */
     syncToolbarTabStops();
-}
-
-/*
- * The two controls the toolbar reads from the snapshot stack rather than from
- * the caret. A pending debounced snapshot is not in the stack yet, but
- * flushing it would add one, so undo counts it.
- */
-function updateHistoryButtons() {
-    undoBtn.disabled = undoIndex <= 0 && !undoTimer;
-    redoBtn.disabled = undoIndex >= undoStack.length - 1;
 }
 
 /*
@@ -984,8 +987,14 @@ function toolbarControls() {
     );
 }
 
+/*
+ * A control that is disabled or not on screen cannot be reached, so neither
+ * kind is part of the ring the arrow keys walk.
+ */
 function enabledToolbarControls() {
-    return toolbarControls().filter((button) => !button.disabled);
+    return toolbarControls().filter(
+        (button) => !button.disabled && !button.hidden,
+    );
 }
 
 function syncToolbarTabStops() {
@@ -1762,8 +1771,9 @@ function wrapOrphanListItems(root) {
  * Ctrl+Shift+8 produces a different character on a different layout.
  *
  * The table is the reference for what the editor can do without a mouse, so
- * it covers every toolbar button. checkCommandCoverage rejects a name here
- * that the command table does not know.
+ * it covers every toolbar button, and undo and redo, which have no button.
+ * checkCommandCoverage rejects a name here that the command table does not
+ * know.
  */
 const editingShortcuts = [
     { key: "b", cmd: "bold" },
@@ -1784,9 +1794,14 @@ const editingShortcuts = [
         cmd: "formatBlock",
         val: level,
     })),
-    { key: "z", cmd: "undo" },
-    { key: "y", cmd: "redo" },
-    { key: "z", shift: true, cmd: "redo" },
+    /*
+     * Undo and redo are the one pair with no control of their own: the
+     * keyboard is the only way to reach them, so they carry their own name
+     * rather than borrowing one from a button.
+     */
+    { key: "z", cmd: "undo", label: "Undo" },
+    { key: "y", cmd: "redo", label: "Redo" },
+    { key: "z", shift: true, cmd: "redo", label: "Redo" },
     { key: "c", alt: true, cmd: "copyOutput" },
     { code: "Slash", cmd: "help" },
 ];
@@ -2780,9 +2795,13 @@ function storePrevious(html) {
     }
 }
 
-/* An empty slot is the one state where the button has nothing to do. */
+/*
+ * The slot is empty until an entry is cleared, which is the one state where
+ * the button has nothing to do. It is hidden rather than disabled, so the
+ * toolbar offers the recovery only while there is one to offer.
+ */
 function updateRestoreButton() {
-    restoreBtn.disabled = readStoredEntry(previousKey) === "";
+    restoreBtn.hidden = readStoredEntry(previousKey) === "";
 }
 
 /*
@@ -3625,22 +3644,6 @@ async function copyOutput() {
 }
 
 copyBtn.addEventListener("click", copyOutput);
-
-/* ---------- Output wrap ---------- */
-
-/*
- * Wrapping is the default, because a journal entry rarely holds a line long
- * enough to need scrolling. Turning it off is how the shape of a long code
- * line gets read, so the choice is the reader's and lasts the session.
- */
-function setOutputWrap(wrapped) {
-    wrapBtn.setAttribute("aria-pressed", String(wrapped));
-    output.classList.toggle("nowrap", !wrapped);
-}
-
-wrapBtn.addEventListener("click", () => {
-    setOutputWrap(wrapBtn.getAttribute("aria-pressed") !== "true");
-});
 
 /* ---------- View tabs ---------- */
 

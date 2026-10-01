@@ -131,6 +131,13 @@ main {
     display: flex;
     flex-direction: column;
     min-height: 0;
+    /*
+     * A column is 1fr, and 1fr's automatic minimum is the item's min-content
+     * width: one unbreakable line in either pane would otherwise widen the
+     * column and push the whole layout off screen. Zeroed, the panes keep
+     * their half and the long line scrolls inside its own well instead.
+     */
+    min-width: 0;
     border-right: 1px solid var(--border);
 }
 
@@ -286,6 +293,13 @@ main {
     line-height: 1.55;
     tab-size: 4;
     white-space: pre-wrap;
+    /*
+     * A long unbroken run, a URL or a base64 blob, has no soft wrap
+     * opportunity inside it, so without this its width becomes the pane's
+     * minimum and the whole two-column layout is pushed off screen. The
+     * output pane already breaks anywhere; the editor has to agree.
+     */
+    overflow-wrap: anywhere;
 }
 
 /*
@@ -367,27 +381,52 @@ main {
     font-size: 13px;
 }
 
-.output-info {
-    display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: 8px;
-    min-width: 0;
-}
-
 /*
- * The count is read against a limit, so its digits keep one width and the
- * row does not shuffle as the entry grows.
+ * The feed size sits in the pane's bottom corner, out of the line of sight
+ * while typing: small, dimmed, and out of the code well's flow. The box is
+ * packed onto its own text, so the hover that raises it covers the numbers
+ * and nothing else. An over-limit entry is the exception, since a paste that
+ * gets cut is worth interrupting for.
+ *
+ * The row is always in the layout and only the text fades in, so the well
+ * above it keeps its height and the first keystroke does not move anything.
  */
 .output-stats {
+    /* Fit-content plus the auto margin parks the text against the pane's
+       right edge, at the same inset the code well uses. The vertical margin
+       is the row's spacing, so the box itself is only ever the text. */
+    width: fit-content;
+    margin: 4px 20px 6px auto;
+    padding: 0;
     color: var(--muted);
+    font-size: 11px;
+    text-align: right;
+    /* Digits keep one width, so the corner does not shuffle as the entry grows. */
     font-variant-numeric: tabular-nums;
+    /*
+     * An empty box has no line to give it height, which would leave the row
+     * shorter until the first digit lands and move the well above it. One
+     * line's height is held instead, filled or not.
+     */
+    line-height: 15px;
+    min-height: 1lh;
+    opacity: 0;
+    transition: opacity 160ms ease;
 }
 
-/* Past the journal field's length the paste is cut short, so this warns. */
+/* An empty entry has nothing to count, so the digits simply stay invisible. */
+.output-stats:not(:empty) {
+    opacity: 0.5;
+}
+
+.output-stats:hover {
+    opacity: 1;
+}
+
 .output-stats.is-over {
     color: var(--danger);
     font-weight: 600;
+    opacity: 1;
 }
 
 .output-actions {
@@ -403,25 +442,6 @@ main {
     font-family: inherit;
     font-size: 13px;
     cursor: pointer;
-}
-
-/* Wrap is a toggle beside the primary action, so it keeps the quiet toolbar
-   look rather than taking the accent fill. */
-#wrapBtn {
-    border-color: var(--border-strong);
-    background: transparent;
-    color: var(--text);
-}
-
-#wrapBtn:hover {
-    border-color: var(--accent);
-    color: var(--accent);
-}
-
-#wrapBtn[aria-pressed="true"] {
-    border-color: var(--accent);
-    background: rgb(from var(--accent) r g b / 0.18);
-    color: var(--accent);
 }
 
 #copyBtn {
@@ -452,6 +472,14 @@ main {
     color: #fff;
 }
 
+/*
+ * The pane carries the well's colour, so the code and the strip the stats
+ * footer sits on read as one surface. The pane header keeps its own colour.
+ */
+#outputPane {
+    background: var(--code-bg);
+}
+
 #output {
     flex: 1;
     overflow: auto;
@@ -468,15 +496,9 @@ main {
     overflow-wrap: anywhere;
 }
 
-/* Wrapping is the default; unwrapped is for reading the shape of a long line. */
-#output.nowrap {
-    white-space: pre;
-    overflow-wrap: normal;
-}
-
 /*
  * The hint is a pseudo-element, so the pane still reads as empty text: Copy
- * has nothing to take and the counter has nothing to show.
+ * has nothing to take and the stats footer has no digits to draw.
  */
 #output.is-empty::before {
     content: attr(data-empty);

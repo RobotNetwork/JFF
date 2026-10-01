@@ -68,26 +68,6 @@
                 >
                     <button
                         type="button"
-                        id="undoBtn"
-                        data-cmd="undo"
-                        aria-label="Undo"
-                    >
-                        ↶
-                    </button>
-
-                    <button
-                        type="button"
-                        id="redoBtn"
-                        data-cmd="redo"
-                        aria-label="Redo"
-                    >
-                        ↷
-                    </button>
-
-                    <div class="sep"></div>
-
-                    <button
-                        type="button"
                         data-cmd="bold"
                         aria-label="Bold"
                         aria-pressed="false"
@@ -284,11 +264,18 @@
                         Clear
                     </button>
 
+                    <!--
+                        Shown only while there is a cleared entry to swap
+                        back, which updateRestoreButton() decides: a recovery
+                        offer when one exists, and nothing to read past when
+                        there is not. It starts hidden because the slot starts
+                        empty.
+                    -->
                     <button
                         type="button"
                         id="restoreBtn"
                         aria-label="Restore the entry you cleared"
-                        disabled
+                        hidden
                     >
                         Restore
                     </button>
@@ -314,26 +301,9 @@
 
             <div class="pane" id="outputPane">
                 <div class="output-head">
-                    <div class="output-info">
-                        <span id="outputLabel">ServiceNow journal output</span>
-                        <!--
-                            Filled by render(). An entry that is pasted into a
-                            journal field is cut at the field's length, and the
-                            field gives no warning of its own.
-                        -->
-                        <span class="output-stats" id="outputStats"></span>
-                    </div>
+                    <span id="outputLabel">ServiceNow journal output</span>
 
                     <div class="output-actions">
-                        <button
-                            type="button"
-                            id="wrapBtn"
-                            aria-label="Wrap long lines"
-                            aria-pressed="true"
-                        >
-                            Wrap
-                        </button>
-
                         <button
                             type="button"
                             id="copyBtn"
@@ -358,6 +328,16 @@
                     aria-labelledby="outputLabel"
                     tabindex="0"
                 ></pre>
+
+                <!--
+                    Filled by render(). An entry that is pasted into a journal
+                    field is cut at the field's length, and the field gives no
+                    warning of its own, so the size is shown here. It sits in
+                    the pane's bottom corner, dimmed, rather than in the row
+                    above: it is read when it is wanted and not while typing.
+                    Empty when there is nothing to count, which hides it.
+                -->
+                <p class="output-stats" id="outputStats"></p>
             </div>
         </main>
 
