@@ -783,14 +783,10 @@ linkDialog.addEventListener("close", () => {
  * button that runs the same command, so a command has one name.
  */
 const extraShortcuts = [
+    // example:
     // {
-    //     keys: "Tab",
-    //     label: "Indent a list item, or a tab inside a code block",
-    // },
-    // { keys: "Shift+Tab", label: "Outdent a list item, or clear one indent" },
-    // {
-    //     keys: "Enter",
-    //     label: "Next list item, leave a code block or quote on an empty line, or step out of inline code",
+    //     keys: "KEY",
+    //     label: "description",
     // },
 ];
 
