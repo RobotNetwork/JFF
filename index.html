@@ -6,9 +6,21 @@
         <!-- Overwritten from the h1 below at start-up, so the name is written
              once; this copy is only what the tab shows before app.js runs. -->
         <title>Journal Entry Formatter</title>
+        <!--
+            Drawn as paths rather than an emoji glyph: an emoji favicon renders
+            whatever the machine's emoji font happens to be (and falls back to
+            tofu where none is installed), and it vanishes into a dark tab bar.
+            A dark tile with the accent green [ ] survives both tab themes, and
+            the brackets are the [code] markup the tool exists to produce.
+            Colours are literal, not var(--accent): a favicon is fetched as an
+            image and never sees the stylesheet. Leading # is %23-escaped; an
+            unescaped # would end the data URI at the fragment.
+        -->
         <link
             rel="icon"
-            href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗃️</text></svg>"
+            type="image/svg+xml"
+            sizes="any"
+            href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%231e2126'/><path d='M12 9.5H8.6V22.5H12' fill='none' stroke='%2362d84e' stroke-width='3.2' stroke-linecap='square'/><path d='M20 9.5H23.4V22.5H20' fill='none' stroke='%2362d84e' stroke-width='3.2' stroke-linecap='square'/></svg>"
         />
 
         <link rel="stylesheet" href="styles.css" />
