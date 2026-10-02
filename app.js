@@ -559,14 +559,33 @@ function linkAt(node) {
 }
 
 /*
- * The link the command was invoked on, when the whole selection sits inside
- * one. That link is being edited or removed rather than a second one being
- * inserted beside it.
+ * The link the command was invoked on: either the whole selection sits inside
+ * one anchor, or the selection is that link's own words with nothing beside
+ * them but whitespace. That link is being edited or removed rather than a
+ * second one being built over the same words.
+ *
+ * The second shape is the common one, and how the browser expresses it is its
+ * own business: Firefox reports a double-clicked link through the text on
+ * either side of it rather than inside it, and a drag that overshoots the
+ * link takes the space after it. Both reach outside the anchor, so the
+ * containers of the two edges cannot be what is compared, and the words are.
  */
 function linkInRange(range) {
     const anchor = linkAt(range.startContainer);
 
-    return anchor && anchor === linkAt(range.endContainer) ? anchor : null;
+    if (anchor && anchor === linkAt(range.endContainer)) return anchor;
+
+    const covered = [...editor.querySelectorAll("a")].filter((candidate) =>
+        range.intersectsNode(candidate),
+    );
+
+    if (covered.length !== 1) return null;
+
+    const words = range.toString().trim();
+
+    return words !== "" && words === covered[0].textContent.trim()
+        ? covered[0]
+        : null;
 }
 
 /*
@@ -746,11 +765,12 @@ linkDialog.addEventListener("close", () => {
     if (!pending.href) return;
 
     /*
-     * A caret inside a link edits that link's URL. createLink would wrap the
-     * caret's text in a second link instead, since there is nothing for it to
-     * turn into a link.
+     * The command was run on a link, so that link's href is replaced rather
+     * than a second one built around the selection: the words being looked
+     * at already belong to the link, and createLink would build another one
+     * over them.
      */
-    if (pending.editing && pending.collapsed) {
+    if (pending.editing) {
         pending.editing.setAttribute("href", pending.href);
 
         queueSnapshot();
@@ -3583,6 +3603,40 @@ editor.addEventListener("input", (event) => {
 editor.addEventListener("keyup", updateToolbarState);
 editor.addEventListener("mouseup", updateToolbarState);
 editor.addEventListener("focus", updateToolbarState);
+
+/*
+ * A link in the editor is inert, because a click has to place the caret for
+ * the words to be edited. Following one is the mouse gesture the browser
+ * reserves for it - Ctrl (Cmd) with the left button, or the middle button -
+ * and it opens the href in a new tab.
+ */
+function linkOpenGesture(event) {
+    if (!linkAt(event.target)) return false;
+
+    return (
+        event.button === 1 ||
+        (event.button === 0 && (event.ctrlKey || event.metaKey))
+    );
+}
+
+function followLink(event) {
+    event.preventDefault();
+
+    window.open(linkAt(event.target).href, "_blank", "noopener");
+}
+
+/* The press is what moves the caret, so it is the event that must not. */
+editor.addEventListener("mousedown", (event) => {
+    if (linkOpenGesture(event)) event.preventDefault();
+});
+
+editor.addEventListener("click", (event) => {
+    if (linkOpenGesture(event)) followLink(event);
+});
+
+editor.addEventListener("auxclick", (event) => {
+    if (linkOpenGesture(event)) followLink(event);
+});
 
 document.addEventListener("selectionchange", () => {
     requestAnimationFrame(updateToolbarState);
