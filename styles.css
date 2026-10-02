@@ -5,7 +5,7 @@
     --border: #3a3f47;
     --border-strong: #7a818c;
     --text: #e4e7eb;
-    --accent: #62d84e;
+    --accent: #1a7f37;
     /* Text and glyphs on an accent fill. */
     --accent-ink: #111;
     /* The code wells: the editor's pre and code, the output pane, a dialog input. */
@@ -331,8 +331,8 @@ main {
 
 #editor:focus {
     background: rgb(from var(--accent) r g b / 0.02);
-    outline: 2px solid var(--accent);
-    outline-offset: -2px;
+    outline: 1px solid var(--accent);
+    outline-offset: -1px;
 }
 
 #editor blockquote {
