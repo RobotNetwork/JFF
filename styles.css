@@ -10,6 +10,9 @@
     --accent-ink: #111;
     /* The code wells: the editor's pre and code, the output pane, a dialog input. */
     --code-bg: #14161a;
+    /* The [code] regions in the output pane. Warm amber, distinct from the
+       green accent so the two are not read as the same kind of thing. */
+    --code-ink: #e9bd5e;
     /* A copy failure and a rejected link URL. */
     --danger: #e5534b;
     --muted: #9aa1ab;
@@ -32,6 +35,7 @@
         --accent: #1a7f37;
         --accent-ink: #ffffff;
         --code-bg: #f0f2f5;
+        --code-ink: #8a5a00;
         --danger: #b3261e;
         --muted: #5b636d;
     }
@@ -503,6 +507,12 @@ main {
 #output.is-empty::before {
     content: attr(data-empty);
     color: var(--muted);
+}
+
+/* Just the delimiters and what they hold, so the rest of the entry reads as
+   plain prose. */
+#output .code-region {
+    color: var(--code-ink);
 }
 
 /* ---------- View tabs ---------- */

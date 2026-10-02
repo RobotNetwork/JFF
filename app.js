@@ -3249,6 +3249,31 @@ function updateOutputStats(body) {
         : "";
 }
 
+/*
+ * Only the [code] regions are coloured, so the markup stands out from the
+ * prose at a glance. The colour sits on a span, and a copy takes textContent,
+ * so what is pasted is plain text with no formatting attached.
+ */
+function paintOutput(body) {
+    const fragment = document.createDocumentFragment();
+
+    body.split(codeRegion).forEach((part, index) => {
+        if (part === "") return;
+
+        if (index % 2 === 0) {
+            fragment.append(document.createTextNode(part));
+            return;
+        }
+
+        const region = document.createElement("span");
+        region.className = "code-region";
+        region.textContent = part;
+        fragment.append(region);
+    });
+
+    output.replaceChildren(fragment);
+}
+
 function render() {
     /*
      * Blank lines at either end come from an empty first or last block and
@@ -3263,7 +3288,7 @@ function render() {
         .replace(/\n+[ \t]*$/, "")
         .replace(/[ \t]+$/, "");
 
-    output.textContent = body;
+    paintOutput(body);
     output.classList.toggle("is-empty", body === "");
     copyBtn.disabled = body === "";
 
