@@ -49,6 +49,28 @@
     box-sizing: border-box;
 }
 
+/*
+ * The chrome is not text to read or copy: the page header and its subtext,
+ * the formatting toolbar and the menus it opens, the output pane's head, the
+ * pane switcher, and the dialog headings and buttons. Without this, a drag
+ * that starts on a label paints a selection highlight over the control being
+ * pressed, which reads as a stuck state. The editor and the output keep the
+ * default, since selecting them is how the entry leaves the app.
+ *
+ * -webkit- is for Safari before 16.4, which only knows the prefixed form.
+ */
+header,
+.toolbar,
+.dropdown-menu,
+.output-head,
+.view-tabs,
+.dialog-actions,
+.link-form h2,
+.shortcut-form h2 {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
 body {
     margin: 0;
     font-family:
@@ -611,7 +633,14 @@ main {
 .copy-menu {
     left: auto;
     right: 0;
-    min-width: 12rem;
+    /* Sized by its one item rather than a fixed 12rem, which left the panel
+       about twice the width of the Copy control it hangs from. max-content is
+       what does the sizing: an absolutely positioned box shrinks to fit its
+       containing block, and the control here is narrower than the item, so
+       without it the label wraps onto four lines. The item's text ("Clear
+       after copy") is the floor, so the panel stays wider than the button and
+       cannot be made exactly the same size. */
+    width: max-content;
 }
 
 .copy-menu button {
@@ -654,9 +683,10 @@ main {
 
 #copyBtn,
 #toolbarCopyBtn {
-    /* Sized for the longest label, so the flash to "Copied!" or "Copy
-       failed" does not move the button or the row around it. */
-    min-width: 6.5rem;
+    /* Holds the resting label and the "Copied!" flash at one width.
+       "Copy failed" is wider than this, so that one flash grows the
+       button and shifts the caret half beside it. */
+    min-width: 4.5rem;
     border: none;
     background: var(--accent);
     color: var(--accent-ink);
