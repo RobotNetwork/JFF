@@ -23,6 +23,24 @@ const shortcutBtn = document.getElementById("shortcutBtn");
 const shortcutsDialog = document.getElementById("shortcutsDialog");
 const shortcutList = document.getElementById("shortcutList");
 const shortcutsClose = document.getElementById("shortcutsClose");
+const splitDivider = document.getElementById("splitDivider");
+const hideOutputBtn = document.getElementById("hideOutputBtn");
+const showOutputBtn = document.getElementById("showOutputBtn");
+const toolbarCopyBtn = document.getElementById("toolbarCopyBtn");
+const toolbarCopySep = document.getElementById("toolbarCopySep");
+const toolbarCopyDropdown = document.getElementById("toolbarCopyDropdown");
+const copyDropdowns = [...document.querySelectorAll(".copy-dropdown")];
+const clearAfterCopyItems = [
+    ...document.querySelectorAll(".clear-after-copy-item"),
+];
+
+/*
+ * Two buttons run the copy command: the one beside the output, and the one
+ * that replaces it in the toolbar while the output is collapsed. Exactly one
+ * is visible at a time, so the flash and the disabled state are written to
+ * both and the hidden one simply carries the change unseen.
+ */
+const copyButtons = [copyBtn, toolbarCopyBtn];
 
 /* ---------- Custom undo/redo history ---------- */
 
@@ -251,7 +269,7 @@ function insertHtmlAtCursor(html) {
 /* ---------- Toolbar ---------- */
 
 toolbar.addEventListener("mousedown", (event) => {
-    if (event.target.closest(".dropdown-toggle")) {
+    if (event.target.closest("#headingToggle")) {
         /*
          * The press is kept from moving focus so the editor selection
          * survives, and the menu opens without stealing it.
@@ -283,7 +301,7 @@ toolbar.addEventListener("mousedown", (event) => {
  * handled above.
  */
 toolbar.addEventListener("click", (event) => {
-    if (event.target.closest(".dropdown-toggle")) {
+    if (event.target.closest("#headingToggle")) {
         if (event.detail !== 0) return;
 
         /*
@@ -1009,7 +1027,7 @@ function toolbarControls() {
  */
 function enabledToolbarControls() {
     return toolbarControls().filter(
-        (button) => !button.disabled && !button.hidden,
+        (button) => !button.disabled && !button.closest("[hidden]"),
     );
 }
 
@@ -1139,8 +1157,16 @@ headingMenu.addEventListener("keydown", (event) => {
  * so this only ever closes an open menu.
  */
 document.addEventListener("mousedown", (event) => {
-    if (!headingMenu.hidden && !event.target.closest(".dropdown")) {
+    if (!headingMenu.hidden && !event.target.closest("#headingDropdown")) {
         closeHeadingMenu();
+    }
+
+    for (const dropdown of copyDropdowns) {
+        const menu = dropdown.querySelector(".copy-menu");
+
+        if (!menu.hidden && !dropdown.contains(event.target)) {
+            setCopyMenuOpen(menu, dropdown.querySelector(".copy-toggle"), false);
+        }
     }
 });
 
@@ -3310,7 +3336,7 @@ function render() {
 
     paintOutput(body);
     output.classList.toggle("is-empty", body === "");
-    copyBtn.disabled = body === "";
+    for (const button of copyButtons) button.disabled = body === "";
 
     updateOutputStats(body);
 
@@ -3656,15 +3682,92 @@ function flashCopyLabel(text, failed) {
      */
     clearTimeout(copyLabelTimer);
 
-    copyBtn.textContent = text;
-    copyBtn.classList.toggle("error", Boolean(failed));
+    for (const button of copyButtons) {
+        button.textContent = text;
+        button.classList.toggle("error", Boolean(failed));
+    }
 
     copyLabelTimer = setTimeout(() => {
         copyLabelTimer = null;
-        copyBtn.textContent = copyLabel;
-        copyBtn.classList.remove("error");
+        for (const button of copyButtons) {
+            button.textContent = copyLabel;
+            button.classList.remove("error");
+        }
     }, copyLabelDelay);
 }
+
+/* ---------- Copy settings menu ---------- */
+
+/*
+ * The one copy preference is a checkable item in each Copy button's menu
+ * rather than a checkbox of its own. It is held here and mirrored onto every
+ * item's aria-checked, which is also what draws the checkmark.
+ */
+let clearAfterCopyEnabled = false;
+
+function setClearAfterCopy(enabled) {
+    clearAfterCopyEnabled = enabled;
+
+    for (const item of clearAfterCopyItems) {
+        item.setAttribute("aria-checked", String(enabled));
+    }
+}
+
+function setCopyMenuOpen(menu, toggle, open, focusItem = false) {
+    menu.hidden = !open;
+    toggle.setAttribute("aria-expanded", String(open));
+
+    if (open && focusItem) {
+        menu.querySelector(".clear-after-copy-item").focus();
+    }
+}
+
+function closeCopyMenus() {
+    for (const { menu, toggle } of copyMenuControls) {
+        if (!menu.hidden) setCopyMenuOpen(menu, toggle, false);
+    }
+}
+
+/*
+ * Two Copy buttons run the one command, and the output pane's hides with the
+ * pane while the toolbar's takes its place, so each carries its own menu and
+ * they share the setting between them. Both toggles are wired directly: the
+ * toolbar's is not the heading toggle, which the toolbar handler owns.
+ */
+const copyMenuControls = copyDropdowns.map((dropdown) => {
+    const toggle = dropdown.querySelector(".copy-toggle");
+    const menu = dropdown.querySelector(".copy-menu");
+    const item = dropdown.querySelector(".clear-after-copy-item");
+
+    toggle.addEventListener("click", (event) => {
+        const opening = menu.hidden;
+
+        closeCopyMenus();
+
+        /* Keyboard activation opens onto the item, so a second Enter may toggle it. */
+        if (opening) setCopyMenuOpen(menu, toggle, true, event.detail === 0);
+    });
+
+    item.addEventListener("click", () => {
+        setClearAfterCopy(!clearAfterCopyEnabled);
+        setCopyMenuOpen(menu, toggle, false);
+        toggle.focus();
+    });
+
+    /* Escape returns to the toggle; Tab closes and moves on, as with the toolbar. */
+    menu.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            setCopyMenuOpen(menu, toggle, false);
+            toggle.focus();
+            return;
+        }
+
+        if (event.key === "Tab") setCopyMenuOpen(menu, toggle, false);
+    });
+
+    return { menu, toggle };
+});
 
 /*
  * The legacy command is the fallback for navigator.clipboard being undefined
@@ -3700,6 +3803,8 @@ function copyViaExecCommand(text) {
  * button's handler.
  */
 async function copyOutput() {
+    closeCopyMenus();
+
     const text = output.textContent;
 
     let copied = false;
@@ -3716,9 +3821,161 @@ async function copyOutput() {
     if (!copied) copied = copyViaExecCommand(text);
 
     flashCopyLabel(copied ? "Copied!" : "Copy failed", !copied);
+
+    /* The one-step loop: copy and the entry resets itself for the next one. */
+    if (copied && clearAfterCopyEnabled) clearEntry();
 }
 
 copyBtn.addEventListener("click", copyOutput);
+
+/* ---------- Pane split and collapse ---------- */
+
+const splitKey = "jff.split.v1";
+const outputVisibleKey = "jff.outputVisible.v1";
+
+let splitRatio = Number.parseFloat(readStoredEntry(splitKey));
+if (!Number.isFinite(splitRatio) || splitRatio < 0.2 || splitRatio > 0.8) {
+    splitRatio = 0.5;
+}
+
+/* Defaults to visible, since an empty slot predates the toggle. */
+let outputVisible = readStoredEntry(outputVisibleKey) !== "0";
+
+function applySplit() {
+    const width = mainEl.getBoundingClientRect().width;
+
+    mainEl.style.setProperty("--editor-w", `${Math.round(width * splitRatio)}px`);
+}
+
+function storeSplit() {
+    if (!storageAvailable()) return;
+
+    try {
+        window.localStorage.setItem(splitKey, String(splitRatio));
+    } catch {
+        /* A store that refuses the write changes nothing, as with the entry. */
+    }
+}
+
+splitDivider.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    splitDivider.setPointerCapture(event.pointerId);
+    splitDivider.classList.add("is-dragging");
+});
+
+splitDivider.addEventListener("pointermove", (event) => {
+    if (!splitDivider.hasPointerCapture(event.pointerId)) return;
+
+    const rect = mainEl.getBoundingClientRect();
+    const ratio = (event.clientX - rect.left) / rect.width;
+
+    splitRatio = Math.min(0.8, Math.max(0.2, ratio));
+    applySplit();
+});
+
+splitDivider.addEventListener("pointerup", (event) => {
+    if (!splitDivider.hasPointerCapture(event.pointerId)) return;
+
+    splitDivider.releasePointerCapture(event.pointerId);
+    splitDivider.classList.remove("is-dragging");
+    storeSplit();
+});
+
+splitDivider.addEventListener("pointercancel", () => {
+    splitDivider.classList.remove("is-dragging");
+});
+
+window.addEventListener("resize", () => {
+    if (outputVisible) applySplit();
+
+    /* Crossing the breakpoint changes which layout decides the pane, and with
+       it where Copy sits. */
+    syncCopyPlacement();
+});
+
+/* The breakpoint the stylesheet uses: above it the output collapses to a
+   column, at or below it the view tabs show one pane at a time. */
+const narrowLayout = matchMedia("(max-width: 800px)");
+
+/*
+ * Copy is one control that moves, not two that show at once. It belongs in the
+ * output head while that pane is on screen, and in the toolbar the moment it
+ * is not, so this asks whichever layout is live which pane is showing rather
+ * than reading either flag on its own: the wide layout collapses the pane with
+ * outputVisible, the narrow one swaps panes with the view tabs.
+ */
+function syncCopyPlacement() {
+    const paneOnScreen = narrowLayout.matches
+        ? mainEl.dataset.view === "output"
+        : outputVisible;
+
+    toolbarCopyDropdown.hidden = paneOnScreen;
+    toolbarCopySep.hidden = paneOnScreen;
+}
+
+/*
+ * The class drives the resting state: it flips the columns and fades the pane.
+ * The column change itself is eased below.
+ */
+function applyOutputVisible() {
+    mainEl.classList.toggle("output-collapsed", !outputVisible);
+    showOutputBtn.hidden = outputVisible;
+    syncCopyPlacement();
+}
+
+/* The fade the stylesheet runs on the pane and divider, in milliseconds. The
+   slide below uses the same figure so the two stay in step. */
+const collapseDuration = 240;
+
+let collapseAnim = null;
+
+/*
+ * The class flips the columns in one step; this eases them instead. It reads
+ * the real grid on either side of the flip, so the keyframes honour the
+ * minmax(220px, …) floor the editor yields to on a narrow window, and it is
+ * driven from JavaScript because Chrome's own grid-track interpolation jumps
+ * between a minmax(…) track and a bare 0px rather than sliding.
+ */
+function animateOutputPane(from, to) {
+    if (collapseAnim) collapseAnim.cancel();
+
+    const anim = mainEl.animate(
+        { gridTemplateColumns: [from, to] },
+        { duration: collapseDuration, easing: "ease" },
+    );
+    collapseAnim = anim;
+    anim.onfinish = () => {
+        if (collapseAnim === anim) collapseAnim = null;
+    };
+}
+
+function setOutputVisible(visible) {
+    outputVisible = visible;
+
+    /* The grid as laid out now, before the class flips it. */
+    const from = getComputedStyle(mainEl).gridTemplateColumns;
+
+    applyOutputVisible();
+    syncToolbarTabStops();
+
+    /* A restore after the window was resized while collapsed re-derives the
+       ratio from the current width, so the editor does not settle on a width
+       the window no longer has. */
+    if (visible) applySplit();
+
+    animateOutputPane(from, getComputedStyle(mainEl).gridTemplateColumns);
+
+    if (storageAvailable()) {
+        try {
+            window.localStorage.setItem(outputVisibleKey, visible ? "1" : "0");
+        } catch {
+            /* Same refusal guard as the entry save. */
+        }
+    }
+}
+
+hideOutputBtn.addEventListener("click", () => setOutputVisible(false));
+showOutputBtn.addEventListener("click", () => setOutputVisible(true));
 
 /* ---------- View tabs ---------- */
 
@@ -3733,6 +3990,9 @@ function setView(view) {
     for (const tab of viewTabs) {
         tab.setAttribute("aria-current", String(tab.dataset.view === view));
     }
+
+    syncCopyPlacement();
+    syncToolbarTabStops();
 
     if (document.activeElement && !document.activeElement.offsetParent) {
         const tab = viewTabs.find((button) => button.dataset.view === view);
@@ -3766,6 +4026,16 @@ buildShortcutList();
 restoreEntry();
 updateRestoreButton();
 
+/* The split and collapse preferences apply before the first paint, so the
+   panes do not flash at the default half-and-half first. */
+applyOutputVisible();
+applySplit();
+
 commitSnapshot();
 render();
 updateToolbarState();
+
+/* The tool's one job is a paste, so the caret is waiting for it. The narrow
+   layout is a phone-first fallback, and a keyboard popped open on load is
+   worse there than the one tap it saves. */
+if (matchMedia("(min-width: 801px)").matches) editor.focus();

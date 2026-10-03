@@ -127,7 +127,7 @@ header span {
 main {
     flex: 1;
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(220px, var(--editor-w, 1fr)) 6px minmax(220px, 1fr);
     min-height: 0;
 }
 
@@ -142,11 +142,74 @@ main {
      * their half and the long line scrolls inside its own well instead.
      */
     min-width: 0;
-    border-right: 1px solid var(--border);
 }
 
-.pane:last-child {
-    border-right: none;
+/*
+ * The divider is the only separator between the two panes. It is a wide,
+ * invisible grab strip whose centre line is the visual boundary, so it reads
+ * as one thin line but gives the pointer a target worth catching.
+ */
+.split-divider {
+    position: relative;
+    cursor: col-resize;
+    background: var(--bg);
+    touch-action: none;
+    /* Fades away in step with the column collapse, and the delayed
+       visibility keeps it out of the tab ring once it has gone. */
+    transition:
+        opacity 240ms ease,
+        visibility 240ms ease;
+}
+
+.split-divider::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    transform: translateX(-50%);
+    background: var(--border);
+}
+
+.split-divider:hover::after,
+.split-divider.is-dragging::after {
+    width: 2px;
+    background: var(--accent);
+}
+
+/*
+ * Collapsing the output is a desktop gesture. The narrow layout already has
+ * its own pane switcher, so the divider and the collapse controls stay out
+ * of it and the collapse class is scoped to the wide layout only.
+ *
+ * The class holds the final state and fades the pane. The column change that
+ * moves the divider is animated from JavaScript with a matching duration, so
+ * the fade and the slide leave and return together. visibility is delayed
+ * rather than instant: on the way out it flips at the end, once the fade has
+ * finished, and on the way back it flips at once so the pane is reachable the
+ * moment it starts to reappear.
+ */
+@media (min-width: 801px) {
+    main.output-collapsed {
+        grid-template-columns: minmax(220px, 1fr) 0px 0px;
+    }
+
+    main.output-collapsed #outputPane,
+    main.output-collapsed .split-divider {
+        opacity: 0;
+        visibility: hidden;
+        overflow: hidden;
+        pointer-events: none;
+    }
+}
+
+@media (max-width: 800px) {
+    .split-divider,
+    #hideOutputBtn,
+    #showOutputBtn {
+        display: none;
+    }
 }
 
 .toolbar {
@@ -238,12 +301,24 @@ main {
     display: flex;
     gap: 4px;
     align-items: center;
+    justify-content: center;
 }
 
+/*
+ * Drawn with borders rather than the "▾" glyph. The glyph's ink sits below the
+ * centre of its line box (the font reserves descent space the triangle never
+ * uses), so it read low in the button on every platform. A border triangle is
+ * a plain 5x4 box, which flex centres on both axes, and it follows the text
+ * colour through currentColor, so the muted and accent states above still hold.
+ */
 .dropdown-toggle::after {
+    width: 0;
+    height: 0;
+    border-top: 4px solid currentColor;
+    border-right: 2.5px solid transparent;
+    border-left: 2.5px solid transparent;
     color: var(--muted);
-    font-size: 9px;
-    content: "▾";
+    content: "";
 }
 
 /*
@@ -448,7 +523,137 @@ main {
     cursor: pointer;
 }
 
-#copyBtn {
+/*
+ * Copy is a split control: the two halves share the accent fill and read as
+ * one button. The caret half opens the menu holding the one preference that
+ * changes what a copy does. The toggle is scoped through .copy-dropdown so it
+ * outranks the panel and toolbar button rules, which would otherwise square
+ * its corners and give it their own border and background.
+ */
+.copy-dropdown {
+    display: flex;
+}
+
+/*
+ * The flex row above outranks the user agent's display:none for [hidden], so
+ * the toolbar copy control would sit beside the output one instead of
+ * replacing it. This keeps exactly one Copy on screen: in the output head
+ * while the pane is open, and in the toolbar once it is collapsed.
+ */
+.copy-dropdown[hidden] {
+    display: none;
+}
+
+#copyBtn,
+#toolbarCopyBtn {
+    border-radius: 4px 0 0 4px;
+}
+
+.copy-dropdown .copy-toggle {
+    padding: 5px 8px;
+    border: none;
+    border-left: 1px solid rgb(0 0 0 / 25%);
+    /* Matches the divider on the left so the content box, and with it the
+       centred caret, sits on the button's true centre rather than half a pixel
+       to the right. Invisible, and the divider still reads as one line. */
+    border-right: 1px solid transparent;
+    border-radius: 0 4px 4px 0;
+    background: var(--accent);
+    color: var(--accent-ink);
+}
+
+.copy-dropdown .copy-toggle::after {
+    color: inherit;
+}
+
+.copy-dropdown .copy-toggle:hover {
+    border-left-color: rgb(0 0 0 / 25%);
+    color: var(--accent-ink);
+    filter: brightness(1.1);
+}
+
+/* The caret mirrors the Copy half, so the split stays one control in every state. */
+#copyBtn:disabled + .copy-toggle,
+#copyBtn:disabled + .copy-toggle:hover,
+#toolbarCopyBtn:disabled + .copy-toggle,
+#toolbarCopyBtn:disabled + .copy-toggle:hover {
+    border-left-color: transparent;
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--border);
+    color: var(--muted);
+    filter: none;
+}
+
+#copyBtn.error + .copy-toggle,
+#toolbarCopyBtn.error + .copy-toggle {
+    background: var(--danger);
+    color: #fff;
+}
+
+/* Hide is secondary, so it takes the outlined treatment the toolbar buttons use
+   rather than falling back to the user agent's light button fill. */
+#hideOutputBtn {
+    border-color: var(--border-strong);
+    background: transparent;
+    color: var(--text);
+}
+
+#hideOutputBtn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+/*
+ * The menu hangs off a right-aligned control, so it opens leftward from the
+ * button's edge. Its single item carries its own styling rather than borrowing
+ * the toolbar buttons' rules, since the menu's other home is the output pane.
+ */
+.copy-menu {
+    left: auto;
+    right: 0;
+    min-width: 12rem;
+}
+
+.copy-menu button {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    padding: 5px 10px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+
+/* The checkmark is the state, so the item itself is not filled when checked. */
+.copy-menu button[aria-checked="true"] {
+    border-color: transparent;
+    background: transparent;
+    color: var(--text);
+}
+
+.copy-menu button::before {
+    width: 1em;
+    color: var(--accent);
+    content: "✓";
+    visibility: hidden;
+}
+
+.copy-menu button[aria-checked="true"]::before {
+    visibility: visible;
+}
+
+.copy-menu button:hover {
+    background: rgb(from var(--accent) r g b / 0.18);
+    color: var(--accent);
+}
+
+#copyBtn,
+#toolbarCopyBtn {
     /* Sized for the longest label, so the flash to "Copied!" or "Copy
        failed" does not move the button or the row around it. */
     min-width: 6.5rem;
@@ -458,12 +663,15 @@ main {
     font-weight: 600;
 }
 
-#copyBtn:hover {
+#copyBtn:hover,
+#toolbarCopyBtn:hover {
     filter: brightness(1.1);
 }
 
 #copyBtn:disabled,
-#copyBtn:disabled:hover {
+#copyBtn:disabled:hover,
+#toolbarCopyBtn:disabled,
+#toolbarCopyBtn:disabled:hover {
     background: transparent;
     box-shadow: inset 0 0 0 1px var(--border);
     color: var(--muted);
@@ -471,7 +679,8 @@ main {
     filter: none;
 }
 
-#copyBtn.error {
+#copyBtn.error,
+#toolbarCopyBtn.error {
     background: var(--danger);
     color: #fff;
 }
@@ -482,6 +691,11 @@ main {
  */
 #outputPane {
     background: var(--code-bg);
+    /* The same fade and delayed visibility the divider uses, so the pane and
+       its divider leave and return together. */
+    transition:
+        opacity 240ms ease,
+        visibility 240ms ease;
 }
 
 #output {

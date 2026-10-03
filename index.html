@@ -287,6 +287,63 @@
                     >
                         Restore
                     </button>
+
+                    <div class="sep" id="toolbarCopySep" hidden></div>
+
+                    <!--
+                        The copy control moves into the toolbar with the same
+                        split shape it has beside the output, so the preference
+                        stays reachable while the output pane is collapsed.
+                    -->
+                    <div
+                        class="dropdown copy-dropdown"
+                        id="toolbarCopyDropdown"
+                        hidden
+                    >
+                        <button
+                            type="button"
+                            id="toolbarCopyBtn"
+                            data-cmd="copyOutput"
+                            aria-label="Copy"
+                            disabled
+                        >
+                            Copy
+                        </button>
+
+                        <button
+                            type="button"
+                            class="dropdown-toggle copy-toggle"
+                            id="toolbarCopyToggle"
+                            aria-haspopup="menu"
+                            aria-expanded="false"
+                            aria-label="Copy options"
+                        ></button>
+
+                        <div
+                            class="dropdown-menu copy-menu"
+                            role="menu"
+                            aria-labelledby="toolbarCopyToggle"
+                            hidden
+                        >
+                            <button
+                                type="button"
+                                role="menuitemcheckbox"
+                                class="clear-after-copy-item"
+                                aria-checked="false"
+                            >
+                                Clear after copy
+                            </button>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        id="showOutputBtn"
+                        aria-label="Show output pane"
+                        hidden
+                    >
+                        Output
+                    </button>
                 </div>
 
                 <!--
@@ -307,6 +364,14 @@
                 ></div>
             </div>
 
+            <div
+                class="split-divider"
+                id="splitDivider"
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize editor and output panes"
+            ></div>
+
             <div class="pane" id="outputPane">
                 <div class="output-head">
                     <span id="outputLabel">ServiceNow journal output</span>
@@ -314,13 +379,55 @@
                     <div class="output-actions">
                         <button
                             type="button"
-                            id="copyBtn"
-                            data-cmd="copyOutput"
-                            aria-label="Copy"
-                            disabled
+                            id="hideOutputBtn"
+                            aria-label="Hide output pane"
                         >
-                            Copy
+                            Hide
                         </button>
+
+                        <!--
+                            Copy is a split control: the label copies, and the
+                            caret opens the menu holding the one preference
+                            that changes what a copy does. The setting lives on
+                            the button it changes rather than in a checkbox of
+                            its own.
+                        -->
+                        <div class="dropdown copy-dropdown" id="copyDropdown">
+                            <button
+                                type="button"
+                                id="copyBtn"
+                                data-cmd="copyOutput"
+                                aria-label="Copy"
+                                disabled
+                            >
+                                Copy
+                            </button>
+
+                            <button
+                                type="button"
+                                class="dropdown-toggle copy-toggle"
+                                id="copyToggle"
+                                aria-haspopup="menu"
+                                aria-expanded="false"
+                                aria-label="Copy options"
+                            ></button>
+
+                            <div
+                                class="dropdown-menu copy-menu"
+                                role="menu"
+                                aria-labelledby="copyToggle"
+                                hidden
+                            >
+                                <button
+                                    type="button"
+                                    role="menuitemcheckbox"
+                                    class="clear-after-copy-item"
+                                    aria-checked="false"
+                                >
+                                    Clear after copy
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
