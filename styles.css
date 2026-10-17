@@ -141,6 +141,13 @@ header span {
     color: var(--accent);
 }
 
+.header-actions button:disabled,
+.header-actions button:disabled:hover {
+    border-color: var(--border);
+    color: var(--muted);
+    cursor: default;
+}
+
 /*
  * One column, centered, at every width. The editor card is the whole of it:
  * the field is opened as a dialog, so it takes no height from the surface the
@@ -604,7 +611,10 @@ main {
     display: flex;
     flex-direction: column;
     width: min(760px, 92vw);
-    height: min(72dvh, 640px);
+    /* A stub until there is anything to show: the box opens at 70px and grows
+       with the entry, capping at the viewport share the full preview used. */
+    min-height: 70px;
+    max-height: min(72dvh, 640px);
     border: 1px solid var(--border-strong);
     border-radius: 6px;
     box-shadow: 0 12px 32px rgb(0 0 0 / 50%);
@@ -632,7 +642,8 @@ main {
  * that div are what #mirror is measured against.
  */
 .mirror-body {
-    flex: 1;
+    /* The content sizes the box up to the cap, then the well scrolls. */
+    flex: 1 1 auto;
     min-height: 0;
     overflow: auto;
     padding: 12px;

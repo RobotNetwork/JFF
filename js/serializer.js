@@ -463,6 +463,9 @@ function render() {
 
     for (const button of copyButtons) button.disabled = body === "";
 
+    /* Nothing to show is the one reason the Preview button is out. */
+    previewBtn.disabled = editorIsEmpty();
+
     /* Nothing to save is the one reason the menu's Save current is out. */
     savedSaveBtn.disabled = editorIsEmpty();
 
