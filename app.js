@@ -1,9 +1,9 @@
 const editor = document.getElementById("editor");
 const mirror = document.getElementById("mirror");
+const mirrorBody = document.getElementById("mirrorBody");
+const journalTime = document.getElementById("journalTime");
 const previewDialog = document.getElementById("previewDialog");
 const previewBtn = document.getElementById("previewBtn");
-const previewClose = document.getElementById("previewClose");
-const copyBtn = document.getElementById("copyBtn");
 const toolbarCopyBtn = document.getElementById("toolbarCopyBtn");
 const toolbar = document.getElementById("toolbar");
 const notice = document.getElementById("notice");
@@ -42,11 +42,10 @@ const nameCancel = document.getElementById("nameCancel");
 const nameSubmit = document.getElementById("nameSubmit");
 
 /*
- * Two buttons run the copy command, one in the toolbar and one in the preview's
- * head. The flash and the disabled state are written to both, so the one the
- * reader is not looking at simply carries the change unseen.
+ * The toolbar's Copy button runs the copy command, and the flash and the
+ * disabled state are written to it.
  */
-const copyButtons = [copyBtn, toolbarCopyBtn];
+const copyButtons = [toolbarCopyBtn];
 
 /*
  * Whether the preview is on screen. It is the one thing that decides whether
@@ -471,8 +470,7 @@ const commands = {
     },
     /*
      * The chord reaches Copy through this table, and so does the toolbar's
-     * button through the toolbar's command delegation; the preview's head is
-     * wired directly below because it sits outside the toolbar.
+     * button through the toolbar's command delegation.
      */
     copyOutput: {
         run: () => {
@@ -3680,7 +3678,7 @@ document.addEventListener("selectionchange", () => {
 const copyLabelDelay = 1200;
 
 /* The label the flash returns to is the button's own, so it is written once. */
-const copyLabel = copyBtn.textContent.trim();
+const copyLabel = toolbarCopyBtn.textContent.trim();
 
 let copyLabelTimer = null;
 
@@ -3854,14 +3852,20 @@ async function copyOutput() {
     if (copied && clearAfterCopyEnabled) clearEntry();
 }
 
-/*
- * The toolbar's Copy runs through the toolbar's command delegation, so only the
- * preview's head is wired here; it sits outside the toolbar. The chord still
- * reaches the same command through the shortcut table.
- */
-copyBtn.addEventListener("click", copyOutput);
-
 /* ---------- Preview dialog ---------- */
+
+/*
+ * The journal timestamp: local date and time with a space separator, as the
+ * captured instance renders it (2026-10-16 16:17:40).
+ */
+function formatJournalTime(date) {
+    const pad = (n) => String(n).padStart(2, "0");
+
+    return (
+        `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
+        `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+    );
+}
 
 /*
  * The field is rendered as the dialog opens rather than on every keystroke
@@ -3877,15 +3881,22 @@ function openPreviewDialog() {
     if (editorIsEmpty()) return;
 
     renderMirror(serializedBody());
+
+    /* The timestamp is the current local time, taken as the dialog opens. */
+    const now = new Date();
+    journalTime.dateTime = now.toISOString();
+    journalTime.textContent = formatJournalTime(now);
+
     previewOpen = true;
     previewDialog.showModal();
+
+    /* The scroll well keeps its position while the dialog is closed, so a
+       preview scrolled to the bottom would reopen there. Each open starts at
+       the top. */
+    mirrorBody.scrollTop = 0;
 }
 
 previewBtn.addEventListener("click", openPreviewDialog);
-
-previewClose.addEventListener("click", () => {
-    previewDialog.close();
-});
 
 closeOnBackdrop(previewDialog, () => {
     previewDialog.close();

@@ -47,8 +47,8 @@
 
 /*
  * The chrome is not text to read or copy: the page header and its subtext,
- * the formatting toolbar and the menus it opens, the preview's head, and the
- * dialog headings and buttons. Without this, a drag that starts on a label
+ * the formatting toolbar and the menus it opens, and the dialog headings and
+ * buttons. Without this, a drag that starts on a label
  * paints a selection highlight over the control being pressed, which reads as
  * a stuck state. The editor keeps the default, since selecting it is how the
  * entry leaves the app.
@@ -58,7 +58,6 @@
 header,
 .toolbar,
 .dropdown-menu,
-.pane-head,
 .dialog-actions,
 .link-form h2,
 .shortcut-form h2,
@@ -440,40 +439,6 @@ main {
 }
 
 /*
- * The head of a panel: what the surface below it is, and the controls that act
- * on it. The preview's read surface wears it, so it reads as the app framing a
- * surface rather than as a different kind of chrome.
- */
-.pane-head {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--border);
-    border-radius: inherit;
-    background: var(--panel);
-    color: var(--muted);
-    font-size: 13px;
-}
-
-.pane-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-left: auto;
-}
-
-.pane-actions button {
-    padding: 5px 12px;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    font-family: inherit;
-    font-size: 13px;
-    cursor: pointer;
-}
-
-/*
  * Copy is a split control: the two halves share the accent fill and read as
  * one button. The caret half opens the menu holding the one preference that
  * changes what a copy does. Both halves are scoped through .copy-dropdown so
@@ -526,24 +491,11 @@ main {
     color: #fff;
 }
 
-/* Close is secondary, so it takes the outlined treatment the toolbar buttons
-   use rather than falling back to the user agent's light button fill. */
-#previewClose {
-    border-color: var(--border-strong);
-    background: transparent;
-    color: var(--text);
-}
-
-#previewClose:hover {
-    border-color: var(--accent);
-    color: var(--accent);
-}
-
 /*
  * The menu hangs off a right-aligned control, so it opens leftward from the
  * button's edge; setCopyMenuOpen flips it rightward when leftward would leave
  * the window. Its single item carries its own styling rather than borrowing
- * the toolbar buttons' rules, since the menu's other home is a dialog head.
+ * the toolbar buttons' rules.
  */
 .copy-menu {
     left: auto;
@@ -642,10 +594,13 @@ main {
 
 /*
  * The box behind the field is the field's own white: it is only ever visible
- * at the corners the head and the field's body do not cover, and what belongs
- * there is the platform, not the page behind the dialog.
+ * at the rounded corners the field's body does not cover, and what belongs
+ * there is the platform, not the page behind the dialog. It is also the
+ * containing block for the accent bar, so the bar spans the dialog's full
+ * height rather than the entry's.
  */
 .preview-box {
+    position: relative;
     display: flex;
     flex-direction: column;
     width: min(760px, 92vw);
@@ -666,8 +621,8 @@ main {
  * is from the captured Polaris page in ex/jsonoutput3.json, which is the
  * authority for this block.
  *
- * The app frames it: the dialog, its head row and the scroll well are the
- * app's, and only what is inside the field is ServiceNow's.
+ * The app frames it: the dialog and the scroll well are the app's, and only
+ * what is inside the field is ServiceNow's.
  */
 
 /*
@@ -681,6 +636,7 @@ main {
     min-height: 0;
     overflow: auto;
     padding: 12px;
+    padding-left: 0;
     background: #fff;
 }
 
@@ -740,6 +696,68 @@ main {
 .mirror-field.is-empty::before {
     content: attr(data-empty);
     color: rgb(140, 145, 152);
+}
+
+/*
+ * The journal entry ServiceNow renders around the note: a gold accent bar on
+ * the left edge and an author line of name and timestamp above the content.
+ * The bar is the card component's accent: 4px, gold at 80% opacity. Values are
+ * from the captured Polaris page, the same authority as the field below.
+ */
+.journal-entry {
+    padding: 0 0 0 20px;
+}
+
+/*
+ * The accent bar runs the dialog's full height rather than the entry's, so it
+ * is positioned against the preview box and spans from its top to its bottom
+ * edge. The box's own rounded corners clip it, so it carries no radius of its
+ * own.
+ */
+.journal-accent {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background-color: rgb(255, 215, 0);
+    opacity: 0.8;
+}
+
+.journal-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.journal-avatar {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgb(209, 214, 214);
+    color: rgb(76, 86, 92);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.journal-author {
+    margin-right: auto;
+    font-size: 14px;
+    color: rgb(16, 23, 26);
+}
+
+.journal-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    white-space: nowrap;
+    font-size: 14px;
+    color: rgb(76, 86, 92);
 }
 
 /* ---------- Saved messages ---------- */

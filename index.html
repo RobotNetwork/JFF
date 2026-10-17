@@ -412,70 +412,43 @@
         <dialog
             id="previewDialog"
             class="preview-dialog"
-            aria-labelledby="previewLabel"
+            aria-label="Work notes"
         >
             <div class="preview-box">
-                <div class="pane-head">
-                    <span id="previewLabel">Work notes</span>
-
-                    <div class="pane-actions">
-                        <button type="button" id="previewClose">Close</button>
-
-                        <!--
-                            Copy is a split control: the label copies, and the
-                            caret opens the menu holding the one preference
-                            that changes what a copy does. It lives in this head
-                            too because a modal covers the page, so the copy the
-                            reader wants while the preview is up has to be in
-                            it. The setting is the toolbar's setting too.
-                        -->
-                        <div class="dropdown copy-dropdown" id="copyDropdown">
-                            <button
-                                type="button"
-                                id="copyBtn"
-                                class="copy-button"
-                                data-cmd="copyOutput"
-                                aria-label="Copy"
-                                disabled
+                <div class="mirror-body" id="mirrorBody">
+                    <div class="journal-entry">
+                        <div class="journal-head">
+                            <span
+                                class="journal-avatar"
+                                aria-hidden="true"
+                                >SA</span
                             >
-                                Copy
-                            </button>
-
-                            <button
-                                type="button"
-                                class="dropdown-toggle copy-toggle"
-                                id="copyToggle"
-                                aria-haspopup="menu"
-                                aria-expanded="false"
-                                aria-label="Copy options"
-                            ></button>
-
-                            <div
-                                class="dropdown-menu copy-menu"
-                                role="menu"
-                                aria-labelledby="copyToggle"
-                                hidden
+                            <span class="journal-author"
+                                >System Administrator</span
                             >
-                                <button
-                                    type="button"
-                                    role="menuitemcheckbox"
-                                    class="clear-after-copy-item"
-                                    aria-checked="false"
+                            <span class="journal-meta">
+                                <span class="journal-field"
+                                    >Work notes</span
                                 >
-                                    Clear after copy
-                                </button>
-                            </div>
+                                <span class="journal-sep" aria-hidden="true"
+                                    >•</span
+                                >
+                                <time
+                                    class="journal-time"
+                                    id="journalTime"
+                                ></time>
+                            </span>
                         </div>
+
+                        <div
+                            class="mirror-field"
+                            id="mirror"
+                            data-empty="Nothing to preview yet."
+                        ></div>
                     </div>
                 </div>
 
-                <div class="mirror-body" id="mirrorBody">
-                    <div
-                        class="mirror-field"
-                        id="mirror"
-                        data-empty="Nothing to preview yet."
-                    ></div>
-                </div>
+                <span class="journal-accent" aria-hidden="true"></span>
             </div>
         </dialog>
 
