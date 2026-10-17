@@ -4,7 +4,7 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <!-- Overwritten from the h1 below at start-up, so the name is written
-             once; this copy is only what the tab shows before app.js runs. -->
+             once; this copy is only what the tab shows before the scripts run. -->
         <title>Journal Entry Formatter</title>
         <!--
             Drawn as paths rather than an emoji glyph: an emoji favicon renders
@@ -548,6 +548,28 @@
             </form>
         </dialog>
 
-        <script src="app.js"></script>
+        <!--
+            Load order matters: each file needs the names declared above it.
+            core.js first, io.js last (it is the start-up).
+        -->
+        <script src="js/core.js"></script>
+        <script src="js/toolbar.js"></script>
+        <script src="js/dialogs.js"></script>
+        <script src="js/toolbar-state.js"></script>
+        <script src="js/markdown.js"></script>
+        <script src="js/richtext.js"></script>
+        <script src="js/keys.js"></script>
+        <script src="js/editing.js"></script>
+        <script src="js/typing.js"></script>
+        <script src="js/entry.js"></script>
+        <script src="js/serializer.js"></script>
+        <script src="js/paste.js"></script>
+        <script src="js/util.js"></script>
+        <script src="js/events.js"></script>
+        <script src="js/copy-menu.js"></script>
+        <script src="js/preview.js"></script>
+        <script src="js/saved.js"></script>
+        <script src="js/save-entry.js"></script>
+        <script src="js/io.js"></script>
     </body>
 </html>
