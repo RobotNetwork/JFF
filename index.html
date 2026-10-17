@@ -121,6 +121,21 @@
         </header>
 
         <!--
+            Reports what the app did or refused to do. It is fixed rather than
+            in the column, so a message reaches the user wherever the pointer
+            is, and it slides in from above the viewport on its own layer. The
+            element is never hidden with the attribute: display:none would cut
+            off the slide before it could play.
+        -->
+        <div
+            class="notice"
+            id="notice"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+        ></div>
+
+        <!--
             One column at every width, centered with a gutter on each side.
             The editor card is the whole of it: the field and the raw markup
             are both opened rather than given a column of their own, so the
@@ -383,13 +398,6 @@
                     </div>
                 </div>
 
-                <!--
-                    Reports content the editor cannot carry: a pasted image is
-                    removed by the sanitizer, and a paste that was only an image
-                    would otherwise look like nothing happened at all.
-                -->
-                <p class="notice" id="notice" role="status" hidden></p>
-
                 <div
                     id="editor"
                     contenteditable="true"
@@ -509,9 +517,7 @@
 
                 <ul class="shortcut-list" id="shortcutList" role="list"></ul>
 
-                <p class="shortcut-note">
-                    Ctrl on Windows/Linux, Cmd on macOS.
-                </p>
+
 
                 <div class="dialog-actions">
                     <button type="button" id="shortcutsClose" class="primary">

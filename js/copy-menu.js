@@ -145,7 +145,11 @@ async function copyOutput() {
 
     if (!copied) copied = copyViaExecCommand(text);
 
-    flashCopyLabel(copied ? "Copied!" : "Copy failed", !copied);
+    showNotice(
+        copied
+            ? "Copied to clipboard!"
+            : "Could not copy markdown to clipboard.",
+    );
 
     /* The one-step loop: copy and the entry resets itself for the next one. */
     if (copied && clearAfterCopyEnabled) clearEntry();

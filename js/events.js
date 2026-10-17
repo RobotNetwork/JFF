@@ -61,30 +61,3 @@ document.addEventListener("selectionchange", () => {
     requestAnimationFrame(updateToolbarState);
 });
 
-const copyLabelDelay = 1200;
-
-/* The label the flash returns to is the button's own, so it is written once. */
-const copyLabel = toolbarCopyBtn.textContent.trim();
-
-let copyLabelTimer = null;
-
-function flashCopyLabel(text, failed) {
-    /*
-     * A stored handle means a second click cannot be cut short by the first
-     * click's timer resetting the label.
-     */
-    clearTimeout(copyLabelTimer);
-
-    for (const button of copyButtons) {
-        button.textContent = text;
-        button.classList.toggle("error", Boolean(failed));
-    }
-
-    copyLabelTimer = setTimeout(() => {
-        copyLabelTimer = null;
-        for (const button of copyButtons) {
-            button.textContent = copyLabel;
-            button.classList.remove("error");
-        }
-    }, copyLabelDelay);
-}

@@ -20,11 +20,11 @@ function showNotice(message) {
     clearTimeout(noticeTimer);
 
     notice.textContent = message;
-    notice.hidden = false;
+    notice.classList.add("is-visible");
 
     noticeTimer = setTimeout(() => {
         noticeTimer = null;
-        notice.hidden = true;
+        notice.classList.remove("is-visible");
     }, noticeDelay);
 }
 

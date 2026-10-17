@@ -46,8 +46,8 @@ const nameCancel = document.getElementById("nameCancel");
 const nameSubmit = document.getElementById("nameSubmit");
 
 /*
- * The toolbar's Copy button runs the copy command, and the flash and the
- * disabled state are written to it.
+ * The toolbar's Copy button is the one copy control. render() disables it
+ * while the entry holds nothing to copy.
  */
 const copyButtons = [toolbarCopyBtn];
 

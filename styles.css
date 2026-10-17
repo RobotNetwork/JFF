@@ -39,6 +39,10 @@
     .dropdown-menu {
         box-shadow: 0 6px 16px rgb(0 0 0 / 18%);
     }
+
+    .notice {
+        box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+    }
 }
 
 * {
@@ -278,18 +282,50 @@ main {
 }
 
 /*
- * Sits between the toolbar and the editor, where a paste that lost something
- * is closest to the work. The accent edge marks it as a report rather than a
- * warning about the entry itself.
+ * The one report surface: pasted content that lost something, a saved message
+ * that was added or removed, an import that failed. It sits on its own layer
+ * above the header, so it is never clipped by the card and never moves the
+ * layout it reports on. The hidden state carries it off the top of the
+ * viewport; the visible state drops it to just over the header bar.
+ *
+ * position is fixed and pointer-events is none: the notice must never take a
+ * click meant for the control underneath it, and it clears itself.
  */
 .notice {
-    margin: 0;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--border);
+    position: fixed;
+    top: 0;
+    left: 50%;
+    z-index: 50;
+    width: max-content;
+    max-width: min(560px, calc(100vw - 24px));
+    padding: 8px 14px;
+    border: 1px solid var(--border-strong);
     border-left: 3px solid var(--accent);
+    border-radius: 6px;
     background: var(--panel);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
     color: var(--text);
     font-size: 13px;
+    /* A saved message's name can be one unbroken run of 120 characters. */
+    overflow-wrap: anywhere;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, calc(-100% - 16px));
+    transition:
+        opacity 160ms ease,
+        transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.notice.is-visible {
+    opacity: 1;
+    transform: translate(-50%, 8px);
+}
+
+/* The motion is how the notice arrives, not what it says. */
+@media (prefers-reduced-motion: reduce) {
+    .notice {
+        transition: none;
+    }
 }
 
 .dropdown {
@@ -493,11 +529,6 @@ main {
     filter: none;
 }
 
-.copy-button.error + .copy-toggle {
-    background: var(--danger);
-    color: #fff;
-}
-
 /*
  * The menu hangs off a right-aligned control, so it opens leftward from the
  * button's edge; setCopyMenuOpen flips it rightward when leftward would leave
@@ -556,10 +587,6 @@ main {
 }
 
 .copy-dropdown .copy-button {
-    /* Holds the resting label and the "Copied!" flash at one width.
-       "Copy failed" is wider than this, so that one flash grows the
-       button and shifts the caret half beside it. */
-    min-width: 4.5rem;
     border: none;
     background: var(--accent);
     color: var(--accent-ink);
@@ -577,11 +604,6 @@ main {
     color: var(--muted);
     cursor: default;
     filter: none;
-}
-
-.copy-dropdown .copy-button.error {
-    background: var(--danger);
-    color: #fff;
 }
 
 /*
