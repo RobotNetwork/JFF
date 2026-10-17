@@ -1,13 +1,13 @@
 const editor = document.getElementById("editor");
-const output = document.getElementById("output");
+const mirror = document.getElementById("mirror");
+const previewDialog = document.getElementById("previewDialog");
+const previewBtn = document.getElementById("previewBtn");
+const previewClose = document.getElementById("previewClose");
 const copyBtn = document.getElementById("copyBtn");
-const outputStats = document.getElementById("outputStats");
+const toolbarCopyBtn = document.getElementById("toolbarCopyBtn");
 const toolbar = document.getElementById("toolbar");
-const restoreBtn = document.getElementById("restoreBtn");
 const notice = document.getElementById("notice");
 const saveState = document.getElementById("saveState");
-const mainEl = document.querySelector("main");
-const viewTabs = [...document.querySelectorAll(".view-tabs button")];
 const headingToggle = document.getElementById("headingToggle");
 const headingMenu = document.getElementById("headingMenu");
 const linkDialog = document.getElementById("linkDialog");
@@ -18,29 +18,42 @@ const linkTextRow = document.getElementById("linkTextRow");
 const linkError = document.getElementById("linkError");
 const linkCancel = document.getElementById("linkCancel");
 const linkRemove = document.getElementById("linkRemove");
-const clearBtn = document.getElementById("clearBtn");
 const shortcutBtn = document.getElementById("shortcutBtn");
 const shortcutsDialog = document.getElementById("shortcutsDialog");
 const shortcutList = document.getElementById("shortcutList");
 const shortcutsClose = document.getElementById("shortcutsClose");
-const splitDivider = document.getElementById("splitDivider");
-const hideOutputBtn = document.getElementById("hideOutputBtn");
-const showOutputBtn = document.getElementById("showOutputBtn");
-const toolbarCopyBtn = document.getElementById("toolbarCopyBtn");
-const toolbarCopySep = document.getElementById("toolbarCopySep");
-const toolbarCopyDropdown = document.getElementById("toolbarCopyDropdown");
 const copyDropdowns = [...document.querySelectorAll(".copy-dropdown")];
 const clearAfterCopyItems = [
     ...document.querySelectorAll(".clear-after-copy-item"),
 ];
+const savedDropdown = document.getElementById("savedDropdown");
+const savedToggle = document.getElementById("savedToggle");
+const savedMenu = document.getElementById("savedMenu");
+const savedEmpty = document.getElementById("savedEmpty");
+const savedList = document.getElementById("savedList");
+const savedSaveBtn = document.getElementById("savedSaveBtn");
+const savedImportBtn = document.getElementById("savedImportBtn");
+const savedExportBtn = document.getElementById("savedExportBtn");
+const savedFile = document.getElementById("savedFile");
+const nameDialog = document.getElementById("nameDialog");
+const nameForm = document.getElementById("nameForm");
+const nameInput = document.getElementById("nameInput");
+const nameCancel = document.getElementById("nameCancel");
+const nameSubmit = document.getElementById("nameSubmit");
 
 /*
- * Two buttons run the copy command: the one beside the output, and the one
- * that replaces it in the toolbar while the output is collapsed. Exactly one
- * is visible at a time, so the flash and the disabled state are written to
- * both and the hidden one simply carries the change unseen.
+ * Two buttons run the copy command, one in the toolbar and one in the preview's
+ * head. The flash and the disabled state are written to both, so the one the
+ * reader is not looking at simply carries the change unseen.
  */
 const copyButtons = [copyBtn, toolbarCopyBtn];
+
+/*
+ * Whether the preview is on screen. It is the one thing that decides whether
+ * the field is rendered at all: it is closed until it is asked for, and a
+ * closed dialog is not what the entry is written into.
+ */
+let previewOpen = false;
 
 /* ---------- Custom undo/redo history ---------- */
 
@@ -444,9 +457,10 @@ const commands = {
     },
     removeFormat: { run: () => execCommand("removeFormat") },
     /*
-     * Neither of these changes the entry. They are commands so the shortcut
-     * table can name them, which is what puts them in the reference dialog,
-     * and their buttons live outside the toolbar the table drives.
+     * The reference dialog, from the header button and the chord. It changes
+     * nothing in the entry; it is a command so the shortcut table can name it
+     * and the reference can list it, and its button lives outside the toolbar
+     * that table drives.
      */
     help: {
         run: () => {
@@ -455,6 +469,11 @@ const commands = {
             return true;
         },
     },
+    /*
+     * The chord reaches Copy through this table, and so does the toolbar's
+     * button through the toolbar's command delegation; the preview's head is
+     * wired directly below because it sits outside the toolbar.
+     */
     copyOutput: {
         run: () => {
             copyOutput();
@@ -930,21 +949,6 @@ function buildTooltips() {
 
         button.title = shortcut ? `${name} (${chordLabel(shortcut)})` : name;
     }
-
-    /*
-     * Clear is not a formatting command, so the table has no entry for it,
-     * but its tooltip points at the undo chord, which does come from there.
-     */
-    const clearLabel = clearBtn.getAttribute("aria-label");
-    const undo = chordLabel(shortcutFor("undo"));
-
-    clearBtn.title = `${clearLabel} and start again (${undo} to undo)`;
-
-    /*
-     * Restore keeps what it replaces, so the cleared entry and the current
-     * one swap places rather than one of them being lost.
-     */
-    restoreBtn.title = `${restoreBtn.getAttribute("aria-label")} (the two entries swap)`;
 }
 
 /*
@@ -1161,6 +1165,10 @@ document.addEventListener("mousedown", (event) => {
         closeHeadingMenu();
     }
 
+    if (!savedMenu.hidden && !event.target.closest("#savedDropdown")) {
+        setSavedMenuOpen(false);
+    }
+
     for (const dropdown of copyDropdowns) {
         const menu = dropdown.querySelector(".copy-menu");
 
@@ -1168,6 +1176,28 @@ document.addEventListener("mousedown", (event) => {
             setCopyMenuOpen(menu, dropdown.querySelector(".copy-toggle"), false);
         }
     }
+});
+
+/*
+ * Escape closes whatever menu is open, wherever the focus is. The controls
+ * that keep the editor's caret from being disturbed do not take focus when
+ * they open, so the key arrives at the editor rather than at the menu, and a
+ * menu cannot hear it from there.
+ */
+document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+
+    if (!savedMenu.hidden) {
+        setSavedMenuOpen(false);
+        savedToggle.focus();
+    }
+
+    if (!headingMenu.hidden) {
+        closeHeadingMenu();
+        headingToggle.focus();
+    }
+
+    closeCopyMenus();
 });
 
 /* ---------- Markdown to HTML ---------- */
@@ -2719,13 +2749,6 @@ function updatePlaceholder() {
  * the rules a paste is held to, whether or not it came from one.
  */
 const storageKey = "jff.entry.v1";
-
-/*
- * The entry that the last Clear replaced. Clearing is a content change and
- * undo brings it back, but only until the next thing typed replaces the
- * entry, so the one that was cleared is kept beside it as well.
- */
-const previousKey = "jff.entry.previous.v1";
 const saveDelay = 400;
 
 let saveTimer = null;
@@ -2826,72 +2849,24 @@ function readStoredEntry(key) {
     }
 }
 
-function storePrevious(html) {
-    if (!storageAvailable()) return;
-
-    try {
-        window.localStorage.setItem(previousKey, html);
-    } catch {
-        /* As in saveEntry: a store that refuses the write is not the edit's
-           problem, and the entry in the editor is untouched by the failure. */
-    }
-}
-
 /*
- * The slot is empty until an entry is cleared, which is the one state where
- * the button has nothing to do. It is hidden rather than disabled, so the
- * toolbar offers the recovery only while there is one to offer.
- */
-function updateRestoreButton() {
-    restoreBtn.hidden = readStoredEntry(previousKey) === "";
-}
-
-/*
- * Clearing is a content change like any other, so it goes through the undo
- * stack rather than past it: the entry is recoverable with Ctrl+Z. It is put
- * beside the entry as well, so it is still there after the undo window.
+ * Emptying the entry is a content change like any other, so it goes through
+ * the undo stack rather than past it and the entry is recoverable with Ctrl+Z.
+ * Its one caller is Copy with Clear after copy on: clearing the entry the
+ * markup was just taken from is a step of the copy, not an action of its own.
  */
 function clearEntry() {
     if (editorIsEmpty()) return;
 
     flushSnapshot();
-    storePrevious(editor.innerHTML);
 
     editor.innerHTML = "";
     commitSnapshot();
 
     render();
     updateToolbarState();
-    updateRestoreButton();
     editor.focus();
 }
-
-/*
- * The cleared entry and the current one change places, so the button is its
- * own undo: a second press puts back what the first one replaced.
- */
-function restorePrevious() {
-    const stored = readStoredEntry(previousKey);
-
-    if (!stored) return;
-
-    flushSnapshot();
-
-    const current = editor.innerHTML;
-
-    editor.innerHTML = parseStoredEntry(stored).body.innerHTML;
-    storePrevious(current);
-
-    commitSnapshot();
-
-    render();
-    updateToolbarState();
-    updateRestoreButton();
-    editor.focus();
-}
-
-clearBtn.addEventListener("click", clearEntry);
-restoreBtn.addEventListener("click", restorePrevious);
 
 document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") flushSave();
@@ -3261,92 +3236,114 @@ function tidyProse(text) {
         .replace(/\n{3,}/g, "\n\n");
 }
 
-/* ---------- Output size ---------- */
-
 /*
- * The length of the entry as it will be pasted. A journal field is a
- * multi-line text field and is cut at its own length, and ServiceNow's own
- * guidance is to show how much room is left rather than let a paste be
- * truncated. Instances differ, so the length is one constant.
+ * The preview's content, built from the serialized markup rather than from the
+ * editor a second time: the entry is what ServiceNow will hold, and a preview
+ * taken from anywhere else could agree with the editor while disagreeing with
+ * the field.
+ *
+ * The [code] delimiters come off, since ServiceNow reads them rather than
+ * showing them, and what they held is the HTML it renders. Everywhere else the
+ * markup is kept as it is and each newline becomes the line break the captured
+ * page shows: ServiceNow stores the entry and renders it, so a newline between
+ * two blocks is a <br> on screen.
  */
-const journalCharLimit = 4000;
-
-function updateOutputStats(body) {
-    if (body === "") {
-        outputStats.textContent = "";
-        outputStats.classList.remove("is-over");
-        outputStats.title = "";
-        return;
-    }
-
-    const lines = body.split("\n").length;
-    const over = body.length > journalCharLimit;
-
-    outputStats.textContent =
-        `${body.length.toLocaleString()} / ${journalCharLimit.toLocaleString()} chars` +
-        ` · ${lines.toLocaleString()} ${lines === 1 ? "line" : "lines"}`;
-
-    outputStats.classList.toggle("is-over", over);
-
-    outputStats.title = over
-        ? `Over the ${journalCharLimit.toLocaleString()} character limit by ${(
-              body.length - journalCharLimit
-          ).toLocaleString()}`
-        : "";
-}
-
-/*
- * Only the [code] regions are coloured, so the markup stands out from the
- * prose at a glance. The colour sits on a span, and a copy takes textContent,
- * so what is pasted is plain text with no formatting attached.
- */
-function paintOutput(body) {
+function mirrorNodes(body) {
     const fragment = document.createDocumentFragment();
 
     body.split(codeRegion).forEach((part, index) => {
         if (part === "") return;
 
         if (index % 2 === 0) {
-            fragment.append(document.createTextNode(part));
+            fragment.append(linesToBreaks(part));
             return;
         }
 
-        const region = document.createElement("span");
-        region.className = "code-region";
-        region.textContent = part;
-        fragment.append(region);
+        const region = document.createElement("template");
+
+        region.innerHTML = part.slice(codeOpen.length, -codeClose.length);
+        fragment.append(region.content);
     });
 
-    output.replaceChildren(fragment);
+    return fragment;
 }
 
-function render() {
-    /*
-     * Blank lines at either end come from an empty first or last block and
-     * are dropped, but the indentation of the first line is not: it is what
-     * survives of a pasted snippet's leading whitespace.
-     */
-    const body = serializeChildren(editor, false)
+/*
+ * Prose with its newlines rendered as line breaks. The newlines the serializer
+ * writes are text, so only text nodes are rewritten and a tag's own content is
+ * left alone; a line inside a [code] region never reaches here.
+ */
+function linesToBreaks(html) {
+    const template = document.createElement("template");
+
+    template.innerHTML = html;
+
+    const walker = document.createTreeWalker(
+        template.content,
+        NodeFilter.SHOW_TEXT,
+    );
+    const texts = [];
+
+    while (walker.nextNode()) texts.push(walker.currentNode);
+
+    for (const node of texts) {
+        if (!node.data.includes("\n")) continue;
+
+        const lines = document.createDocumentFragment();
+
+        node.data.split("\n").forEach((line, index) => {
+            if (index > 0) lines.append(document.createElement("br"));
+            if (line) lines.append(document.createTextNode(line));
+        });
+
+        node.replaceWith(lines);
+    }
+
+    return template.content;
+}
+
+function renderMirror(body) {
+    mirror.replaceChildren(mirrorNodes(body));
+    mirror.classList.toggle("is-empty", body === "");
+}
+
+/*
+ * What the entry serializes to. Blank lines at either end come from an empty
+ * first or last block and are dropped, but the indentation of the first line is
+ * not: it is what survives of a pasted snippet's leading whitespace.
+ */
+function serializedBody() {
+    return serializeChildren(editor, false)
         .split(codeRegion)
         .map((part, index) => (index % 2 ? part : tidyProse(part)))
         .join("")
         .replace(/^[ \t]*\n+/, "")
         .replace(/\n+[ \t]*$/, "")
         .replace(/[ \t]+$/, "");
+}
 
-    paintOutput(body);
-    output.classList.toggle("is-empty", body === "");
+function render() {
+    const body = serializedBody();
+
+    /*
+     * The preview is rendered only while it is open. It is a dialog that is
+     * closed until it is asked for, and rebuilding a viewport nobody is
+     * looking at on every keystroke is work for nothing; opening it renders
+     * it, so the one on screen is the current entry either way.
+     */
+    if (previewOpen) renderMirror(body);
+
     for (const button of copyButtons) button.disabled = body === "";
 
-    updateOutputStats(body);
+    /* Nothing to save is the one reason the menu's Save current is out. */
+    savedSaveBtn.disabled = editorIsEmpty();
 
     /*
      * render() is the one hook every content change already runs, so the
-     * placeholder, the Clear button and the saved entry are refreshed here
-     * rather than at each call site.
+     * placeholder and the saved entry are refreshed here rather than at each
+     * call site.
      */
     updatePlaceholder();
-    clearBtn.disabled = editorIsEmpty();
     queueSave();
 }
 
@@ -3377,12 +3374,12 @@ function showNotice(message) {
 }
 
 /*
- * Rich clipboard HTML as editor content. Reports how much of it held a
- * picture, and whether anything was left to insert: clipboard HTML can carry
- * structure but no content - a lone <meta> tag, or an image the sanitizer
- * drops, which is the payload a screenshot paste arrives as.
+ * Rich HTML held to the paste rules and returned as editor content. Reports
+ * how much of it held a picture, and whether anything was left: clipboard HTML
+ * can carry structure but no content - a lone <meta> tag, or an image the
+ * sanitizer drops, which is the payload a screenshot paste arrives as.
  */
-function insertRichText(html) {
+function sanitizeEntryHtml(html) {
     const doc = new DOMParser().parseFromString(html, "text/html");
 
     /* Counted before sanitizing, which removes these elements outright. */
@@ -3402,10 +3399,22 @@ function insertRichText(html) {
     normalizeRichTextWhitespace(doc.body);
 
     if (doc.body.textContent.trim() === "") {
-        return { inserted: false, dropped };
+        return { html: "", dropped };
     }
 
-    insertHtmlAtCursor(doc.body.innerHTML);
+    return { html: doc.body.innerHTML, dropped };
+}
+
+/*
+ * Rich clipboard HTML inserted at the caret. Reports how much of it held a
+ * picture, and whether anything was left to insert.
+ */
+function insertRichText(html) {
+    const { html: clean, dropped } = sanitizeEntryHtml(html);
+
+    if (clean === "") return { inserted: false, dropped };
+
+    insertHtmlAtCursor(clean);
 
     return { inserted: true, dropped };
 }
@@ -3713,8 +3722,27 @@ function setClearAfterCopy(enabled) {
     }
 }
 
+/*
+ * The panel is wider than the control it hangs from, and the control lands at
+ * the start of a toolbar row as soon as the toolbar wraps, which would hang a
+ * right-aligned panel past the left edge of the window. Right-aligned is the
+ * resting state; an open menu whose left edge would leave the window opens to
+ * the right of its control instead.
+ */
+const menuGutter = 8;
+
 function setCopyMenuOpen(menu, toggle, open, focusItem = false) {
     menu.hidden = !open;
+
+    /* Cleared first, so every open measures the resting position. */
+    menu.style.left = "";
+    menu.style.right = "";
+
+    if (open && menu.getBoundingClientRect().left < menuGutter) {
+        menu.style.left = "0";
+        menu.style.right = "auto";
+    }
+
     toggle.setAttribute("aria-expanded", String(open));
 
     if (open && focusItem) {
@@ -3729,10 +3757,10 @@ function closeCopyMenus() {
 }
 
 /*
- * Two Copy buttons run the one command, and the output pane's hides with the
- * pane while the toolbar's takes its place, so each carries its own menu and
- * they share the setting between them. Both toggles are wired directly: the
- * toolbar's is not the heading toggle, which the toolbar handler owns.
+ * Two Copy controls run the one command: the toolbar's and the preview head's.
+ * Each carries its own menu and they share the setting between them, so the
+ * preference reads the same in both places. Both toggles are wired directly:
+ * the toolbar's is not the heading toggle, which the toolbar handler owns.
  */
 const copyMenuControls = copyDropdowns.map((dropdown) => {
     const toggle = dropdown.querySelector(".copy-toggle");
@@ -3772,7 +3800,7 @@ const copyMenuControls = copyDropdowns.map((dropdown) => {
 /*
  * The legacy command is the fallback for navigator.clipboard being undefined
  * on a non-secure origin, and for a rejected write. It works from a temporary
- * selection, since the output pane is not selectable for this purpose.
+ * selection, so the reader's own selection is left alone.
  */
 function copyViaExecCommand(text) {
     const area = document.createElement("textarea");
@@ -3805,7 +3833,7 @@ function copyViaExecCommand(text) {
 async function copyOutput() {
     closeCopyMenus();
 
-    const text = output.textContent;
+    const text = serializedBody();
 
     let copied = false;
 
@@ -3826,184 +3854,441 @@ async function copyOutput() {
     if (copied && clearAfterCopyEnabled) clearEntry();
 }
 
+/*
+ * The toolbar's Copy runs through the toolbar's command delegation, so only the
+ * preview's head is wired here; it sits outside the toolbar. The chord still
+ * reaches the same command through the shortcut table.
+ */
 copyBtn.addEventListener("click", copyOutput);
 
-/* ---------- Pane split and collapse ---------- */
-
-const splitKey = "jff.split.v1";
-const outputVisibleKey = "jff.outputVisible.v1";
-
-let splitRatio = Number.parseFloat(readStoredEntry(splitKey));
-if (!Number.isFinite(splitRatio) || splitRatio < 0.2 || splitRatio > 0.8) {
-    splitRatio = 0.5;
-}
-
-/* Defaults to visible, since an empty slot predates the toggle. */
-let outputVisible = readStoredEntry(outputVisibleKey) !== "0";
-
-function applySplit() {
-    const width = mainEl.getBoundingClientRect().width;
-
-    mainEl.style.setProperty("--editor-w", `${Math.round(width * splitRatio)}px`);
-}
-
-function storeSplit() {
-    if (!storageAvailable()) return;
-
-    try {
-        window.localStorage.setItem(splitKey, String(splitRatio));
-    } catch {
-        /* A store that refuses the write changes nothing, as with the entry. */
-    }
-}
-
-splitDivider.addEventListener("pointerdown", (event) => {
-    event.preventDefault();
-    splitDivider.setPointerCapture(event.pointerId);
-    splitDivider.classList.add("is-dragging");
-});
-
-splitDivider.addEventListener("pointermove", (event) => {
-    if (!splitDivider.hasPointerCapture(event.pointerId)) return;
-
-    const rect = mainEl.getBoundingClientRect();
-    const ratio = (event.clientX - rect.left) / rect.width;
-
-    splitRatio = Math.min(0.8, Math.max(0.2, ratio));
-    applySplit();
-});
-
-splitDivider.addEventListener("pointerup", (event) => {
-    if (!splitDivider.hasPointerCapture(event.pointerId)) return;
-
-    splitDivider.releasePointerCapture(event.pointerId);
-    splitDivider.classList.remove("is-dragging");
-    storeSplit();
-});
-
-splitDivider.addEventListener("pointercancel", () => {
-    splitDivider.classList.remove("is-dragging");
-});
-
-window.addEventListener("resize", () => {
-    if (outputVisible) applySplit();
-
-    /* Crossing the breakpoint changes which layout decides the pane, and with
-       it where Copy sits. */
-    syncCopyPlacement();
-});
-
-/* The breakpoint the stylesheet uses: above it the output collapses to a
-   column, at or below it the view tabs show one pane at a time. */
-const narrowLayout = matchMedia("(max-width: 800px)");
+/* ---------- Preview dialog ---------- */
 
 /*
- * Copy is one control that moves, not two that show at once. It belongs in the
- * output head while that pane is on screen, and in the toolbar the moment it
- * is not, so this asks whichever layout is live which pane is showing rather
- * than reading either flag on its own: the wide layout collapses the pane with
- * outputVisible, the narrow one swaps panes with the view tabs.
+ * The field is rendered as the dialog opens rather than on every keystroke
+ * behind a closed one, which is what makes it never a frame behind the entry:
+ * the render is taken from the editor at the moment it is shown. showModal
+ * throws on a dialog that is already open, so the open state is checked
+ * rather than assumed.
  */
-function syncCopyPlacement() {
-    const paneOnScreen = narrowLayout.matches
-        ? mainEl.dataset.view === "output"
-        : outputVisible;
+function openPreviewDialog() {
+    if (previewDialog.open) return;
 
-    toolbarCopyDropdown.hidden = paneOnScreen;
-    toolbarCopySep.hidden = paneOnScreen;
+    /* Nothing to show: the dialog does not open over an empty entry. */
+    if (editorIsEmpty()) return;
+
+    renderMirror(serializedBody());
+    previewOpen = true;
+    previewDialog.showModal();
+}
+
+previewBtn.addEventListener("click", openPreviewDialog);
+
+previewClose.addEventListener("click", () => {
+    previewDialog.close();
+});
+
+closeOnBackdrop(previewDialog, () => {
+    previewDialog.close();
+});
+
+/* Every way out comes through here: the button, Escape, the backdrop, or a
+   form method=dialog in some later version of this. */
+previewDialog.addEventListener("close", () => {
+    previewOpen = false;
+});
+
+/* ---------- Saved messages ---------- */
+
+/*
+ * A saved message is the editor's HTML as it stood, not the serialized
+ * markup: it goes back in through the same paste rules, so a message is held
+ * to the rules a paste is held to whether or not it came from one. The store
+ * is a plain JSON array, which makes an export something a person can read and
+ * an import the same file back.
+ */
+const savedKey = "jff.saved.v1";
+const savedNameLimit = 120;
+const savedPreviewLimit = 90;
+
+function newRecordId() {
+    return crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 /*
- * The class drives the resting state: it flips the columns and fades the pane.
- * The column change itself is eased below.
+ * One shape check for a stored row and an imported one. localStorage is the
+ * user's to edit and a file is theirs to write, so a row either matches or is
+ * dropped: nothing here repairs half a record into one.
  */
-function applyOutputVisible() {
-    mainEl.classList.toggle("output-collapsed", !outputVisible);
-    showOutputBtn.hidden = outputVisible;
-    syncCopyPlacement();
-}
+function savedRecord(value) {
+    if (!value || typeof value !== "object") return null;
 
-/* The fade the stylesheet runs on the pane and divider, in milliseconds. The
-   slide below uses the same figure so the two stay in step. */
-const collapseDuration = 240;
+    const name = typeof value.name === "string" ? value.name.trim() : "";
+    const html = typeof value.html === "string" ? value.html.trim() : "";
 
-let collapseAnim = null;
+    if (name === "" || html === "") return null;
 
-/*
- * The class flips the columns in one step; this eases them instead. It reads
- * the real grid on either side of the flip, so the keyframes honour the
- * minmax(220px, …) floor the editor yields to on a narrow window, and it is
- * driven from JavaScript because Chrome's own grid-track interpolation jumps
- * between a minmax(…) track and a bare 0px rather than sliding.
- */
-function animateOutputPane(from, to) {
-    if (collapseAnim) collapseAnim.cancel();
-
-    const anim = mainEl.animate(
-        { gridTemplateColumns: [from, to] },
-        { duration: collapseDuration, easing: "ease" },
-    );
-    collapseAnim = anim;
-    anim.onfinish = () => {
-        if (collapseAnim === anim) collapseAnim = null;
+    return {
+        id:
+            typeof value.id === "string" && value.id !== ""
+                ? value.id
+                : newRecordId(),
+        name: name.slice(0, savedNameLimit),
+        html,
+        savedAt: Number.isFinite(value.savedAt) ? value.savedAt : Date.now(),
     };
 }
 
-function setOutputVisible(visible) {
-    outputVisible = visible;
+function readSaved() {
+    const raw = readStoredEntry(savedKey);
 
-    /* The grid as laid out now, before the class flips it. */
-    const from = getComputedStyle(mainEl).gridTemplateColumns;
+    if (!raw) return [];
 
-    applyOutputVisible();
-    syncToolbarTabStops();
+    let parsed = null;
 
-    /* A restore after the window was resized while collapsed re-derives the
-       ratio from the current width, so the editor does not settle on a width
-       the window no longer has. */
-    if (visible) applySplit();
-
-    animateOutputPane(from, getComputedStyle(mainEl).gridTemplateColumns);
-
-    if (storageAvailable()) {
-        try {
-            window.localStorage.setItem(outputVisibleKey, visible ? "1" : "0");
-        } catch {
-            /* Same refusal guard as the entry save. */
-        }
+    try {
+        parsed = JSON.parse(raw);
+    } catch {
+        /* A store someone edited into nonsense reads as empty. */
+        return [];
     }
+
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.map(savedRecord).filter(Boolean);
 }
 
-hideOutputBtn.addEventListener("click", () => setOutputVisible(false));
-showOutputBtn.addEventListener("click", () => setOutputVisible(true));
+/* Reports a refusal rather than letting a save disappear quietly. */
+function writeSaved(records) {
+    if (!storageAvailable()) {
+        showNotice("This browser refuses to store saved messages.");
+        return false;
+    }
 
-/* ---------- View tabs ---------- */
+    try {
+        window.localStorage.setItem(savedKey, JSON.stringify(records));
+
+        return true;
+    } catch {
+        showNotice("Saved messages could not be written: the store is full.");
+
+        return false;
+    }
+}
 
 /*
- * A narrow window shows one pane at a time. The stylesheet does the hiding,
- * so this only records which one is chosen and keeps focus out of the pane
- * that has just gone.
+ * The message's words with a break wherever the markup has one. Text content
+ * alone runs blocks together - a heading and the paragraph under it come out
+ * as one word - so a break is closed over every block boundary first. It reads
+ * a line break as a break too, since that is what the editor means by one.
  */
-function setView(view) {
-    mainEl.dataset.view = view;
+const messageBreakSelector = `${blockSelector}, br`;
 
-    for (const tab of viewTabs) {
-        tab.setAttribute("aria-current", String(tab.dataset.view === view));
+function messageText(html) {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+
+    for (const element of doc.body.querySelectorAll(messageBreakSelector)) {
+        element.after("\n");
     }
 
-    syncCopyPlacement();
-    syncToolbarTabStops();
+    return doc.body.textContent;
+}
 
-    if (document.activeElement && !document.activeElement.offsetParent) {
-        const tab = viewTabs.find((button) => button.dataset.view === view);
+/*
+ * The row's second line: the message's words flattened onto one line, so two
+ * messages that ended up with the same name are still told apart.
+ */
+function savedPreview(html) {
+    const text = messageText(html).replace(/\s+/g, " ").trim();
 
-        if (tab) tab.focus();
+    return text.length > savedPreviewLimit
+        ? `${text.slice(0, savedPreviewLimit).trimEnd()}…`
+        : text;
+}
+
+function savedRow(record) {
+    const item = document.createElement("li");
+    const insert = document.createElement("button");
+    const name = document.createElement("span");
+    const preview = document.createElement("span");
+    const remove = document.createElement("button");
+
+    item.className = "saved-item";
+
+    insert.type = "button";
+    insert.className = "saved-insert";
+    insert.dataset.id = record.id;
+
+    name.className = "saved-name";
+    name.textContent = record.name;
+
+    preview.className = "saved-preview";
+    preview.textContent = savedPreview(record.html);
+
+    insert.append(name, preview);
+
+    remove.type = "button";
+    remove.className = "saved-delete";
+    remove.dataset.id = record.id;
+    remove.textContent = "✕";
+    remove.setAttribute("aria-label", `Delete "${record.name}"`);
+
+    item.append(insert, remove);
+
+    return item;
+}
+
+function renderSavedMenu() {
+    const records = readSaved();
+
+    savedEmpty.hidden = records.length > 0;
+    savedList.replaceChildren(...records.map(savedRow));
+    savedSaveBtn.disabled = editorIsEmpty();
+}
+
+function setSavedMenuOpen(open, focusFirst = false) {
+    if (open) renderSavedMenu();
+
+    savedMenu.hidden = !open;
+    savedToggle.setAttribute("aria-expanded", String(open));
+
+    if (open && focusFirst) {
+        (savedList.querySelector(".saved-insert") ?? savedSaveBtn).focus();
     }
 }
 
-for (const tab of viewTabs) {
-    tab.addEventListener("click", () => setView(tab.dataset.view));
+/*
+ * The press is kept from moving focus, so the caret a row will insert at is
+ * still there when the menu is open.
+ */
+savedToggle.addEventListener("mousedown", (event) => {
+    event.preventDefault();
+});
+
+savedToggle.addEventListener("click", (event) => {
+    setSavedMenuOpen(savedMenu.hidden, event.detail === 0);
+});
+
+/* Tab moves on rather than staying in a menu that no longer has the point. */
+savedMenu.addEventListener("keydown", (event) => {
+    if (event.key === "Tab") setSavedMenuOpen(false);
+});
+
+/* A row is a press target, and the press must leave the caret alone. */
+savedList.addEventListener("mousedown", (event) => {
+    if (event.target.closest(".saved-insert")) event.preventDefault();
+});
+
+savedList.addEventListener("click", (event) => {
+    const insert = event.target.closest(".saved-insert");
+
+    if (insert) {
+        insertSavedMessage(insert.dataset.id);
+        return;
+    }
+
+    const remove = event.target.closest(".saved-delete");
+
+    if (remove) deleteSavedMessage(remove.dataset.id);
+});
+
+function insertSavedMessage(id) {
+    const record = readSaved().find((entry) => entry.id === id);
+
+    if (!record) return;
+
+    setSavedMenuOpen(false);
+
+    const { html } = sanitizeEntryHtml(record.html);
+
+    if (html === "") {
+        showNotice(`"${record.name}" holds nothing to insert.`);
+        return;
+    }
+
+    /*
+     * A saved message replaces the entry, not the caret's surroundings: the
+     * field is emptied and the message becomes the whole of it. The change
+     * goes through the undo stack like any other, so it is recoverable.
+     */
+    flushSnapshot();
+    editor.innerHTML = html;
+    commitSnapshot();
+
+    render();
+    updateToolbarState();
+    editor.focus();
 }
+
+function deleteSavedMessage(id) {
+    const records = readSaved();
+    const record = records.find((entry) => entry.id === id);
+
+    if (!record) return;
+
+    if (!writeSaved(records.filter((entry) => entry.id !== id))) return;
+
+    renderSavedMenu();
+    showNotice(`Deleted "${record.name}".`);
+
+    /* The row that held the focus is gone with it. */
+    if (!savedMenu.hidden && document.activeElement === document.body) {
+        (savedList.querySelector(".saved-insert") ?? savedSaveBtn).focus();
+    }
+}
+
+/* ---------- Saving the current entry ---------- */
+
+/*
+ * The prefill: the entry's first line, which is what a message is usually
+ * named after. Taken from the editor's words rather than the markup, so the
+ * name is the words rather than the tags around them.
+ */
+function firstLineOfEntry() {
+    const line = messageText(editor.innerHTML)
+        .replace(/\u200b/g, "")
+        .split("\n")
+        .map((part) => part.trim())
+        .find((part) => part !== "");
+
+    return (line ?? "").slice(0, 40);
+}
+
+function updateNameSubmit() {
+    nameSubmit.disabled = nameInput.value.trim() === "";
+}
+
+function openNameDialog() {
+    nameInput.value = firstLineOfEntry();
+    updateNameSubmit();
+
+    if (!nameDialog.open) nameDialog.showModal();
+
+    /* The prefill is a suggestion, so typing replaces it and Enter accepts it. */
+    nameInput.select();
+}
+
+savedSaveBtn.addEventListener("click", () => {
+    setSavedMenuOpen(false);
+    openNameDialog();
+});
+
+nameInput.addEventListener("input", updateNameSubmit);
+
+nameCancel.addEventListener("click", () => {
+    nameDialog.close();
+});
+
+nameForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+
+    const name = nameInput.value.trim().slice(0, savedNameLimit);
+
+    if (name === "") return;
+
+    const records = readSaved();
+
+    records.push({
+        id: newRecordId(),
+        name,
+        html: editor.innerHTML,
+        savedAt: Date.now(),
+    });
+
+    if (writeSaved(records)) showNotice(`Saved "${name}".`);
+
+    nameDialog.close();
+});
+
+closeOnBackdrop(nameDialog, () => {
+    nameDialog.close();
+});
+
+/*
+ * The dialog took the focus, and a save leaves the entry exactly as it was, so
+ * the caret goes back to where it was rather than to the menu it came from.
+ */
+nameDialog.addEventListener("close", () => {
+    editor.focus();
+});
+
+/* ---------- Import and export ---------- */
+
+savedImportBtn.addEventListener("click", () => {
+    /* Cleared first, so choosing the same file twice still fires a change. */
+    savedFile.value = "";
+    savedFile.click();
+});
+
+savedFile.addEventListener("change", async () => {
+    const [file] = savedFile.files ?? [];
+
+    if (file) await importSaved(file);
+});
+
+async function importSaved(file) {
+    let incoming = null;
+
+    try {
+        const parsed = JSON.parse(await file.text());
+
+        if (!Array.isArray(parsed)) throw new Error("not a list");
+
+        incoming = parsed.map(savedRecord).filter(Boolean);
+    } catch {
+        showNotice("That file is not a saved-messages export.");
+        return;
+    }
+
+    if (incoming.length === 0) {
+        showNotice("That file holds no saved messages.");
+        return;
+    }
+
+    const merged = new Map(readSaved().map((record) => [record.id, record]));
+
+    /*
+     * A record naming an id already held replaces it, so importing the same
+     * export twice leaves the store as it was the second time.
+     */
+    for (const record of incoming) merged.set(record.id, record);
+
+    if (!writeSaved([...merged.values()])) return;
+
+    setSavedMenuOpen(false);
+    showNotice(
+        `Imported ${incoming.length} message${incoming.length === 1 ? "" : "s"}.`,
+    );
+}
+
+savedExportBtn.addEventListener("click", () => {
+    const records = readSaved();
+
+    if (records.length === 0) {
+        showNotice("There is nothing saved to export yet.");
+        return;
+    }
+
+    const url = URL.createObjectURL(
+        new Blob([JSON.stringify(records, null, 2)], {
+            type: "application/json",
+        }),
+    );
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = "journal-messages.json";
+    link.click();
+
+    /* Held for a moment, so the download has the blob before it is released. */
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    setSavedMenuOpen(false);
+    showNotice(
+        `Exported ${records.length} message${records.length === 1 ? "" : "s"}.`,
+    );
+});
 
 /*
  * Formatting commands are captured as tags rather than as inline styles: the
@@ -4024,18 +4309,12 @@ buildShortcutList();
  * place before the first snapshot is taken.
  */
 restoreEntry();
-updateRestoreButton();
-
-/* The split and collapse preferences apply before the first paint, so the
-   panes do not flash at the default half-and-half first. */
-applyOutputVisible();
-applySplit();
 
 commitSnapshot();
 render();
 updateToolbarState();
 
-/* The tool's one job is a paste, so the caret is waiting for it. The narrow
-   layout is a phone-first fallback, and a keyboard popped open on load is
-   worse there than the one tap it saves. */
+/* The tool's one job is a paste, so the caret is waiting for it. A phone gets
+   no focus: a keyboard popped open on load is worse there than the one tap it
+   saves. */
 if (matchMedia("(min-width: 801px)").matches) editor.focus();

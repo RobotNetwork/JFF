@@ -40,6 +40,74 @@
                     Not saved
                 </span>
 
+                <!--
+                    Saved messages. A menu rather than a dialog: inserting one
+                    is the whole action and the list is what it is chosen from.
+                    The rows are rebuilt every time it opens, so the menu never
+                    holds a stale copy of the store.
+                -->
+                <div class="dropdown" id="savedDropdown">
+                    <button
+                        type="button"
+                        class="dropdown-toggle"
+                        id="savedToggle"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        aria-controls="savedMenu"
+                    >
+                        Saved
+                    </button>
+
+                    <div class="dropdown-menu saved-menu" id="savedMenu" hidden>
+                        <p class="saved-empty" id="savedEmpty">
+                            No saved messages yet. Save one, or import an
+                            export.
+                        </p>
+
+                        <ul
+                            class="saved-list"
+                            id="savedList"
+                            role="list"
+                            aria-label="Saved messages"
+                        ></ul>
+
+                        <div class="saved-actions">
+                            <button type="button" id="savedSaveBtn">
+                                Save current
+                            </button>
+
+                            <button type="button" id="savedImportBtn">
+                                Import
+                            </button>
+
+                            <button type="button" id="savedExportBtn">
+                                Export
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!--
+                    The work notes field is opened rather than shown: it is a
+                    viewport's worth of height for something read once the
+                    entry is written, so it sits beside Save rather than in the
+                    column. Nothing is rendered into it until it is asked for.
+                -->
+                <button type="button" id="previewBtn" aria-haspopup="dialog">
+                    Preview
+                </button>
+
+                <!--
+                    Hidden, since Import is a button in the menu and a picker
+                    needs a file input behind it.
+                -->
+                <input
+                    type="file"
+                    id="savedFile"
+                    accept="application/json,.json"
+                    hidden
+                />
+
                 <button
                     type="button"
                     id="shortcutBtn"
@@ -53,20 +121,12 @@
         </header>
 
         <!--
-            Only shown on a narrow screen, where one pane at a time is more
-            usable than a 50/50 split under a phone keyboard. The buttons
-            mark the view in use rather than prescribing a tab panel, and the
-            stylesheet does the hiding.
+            One column at every width, centered with a gutter on each side.
+            The editor card is the whole of it: the field and the raw markup
+            are both opened rather than given a column of their own, so the
+            work surface gets the height instead of sharing it.
         -->
-        <nav class="view-tabs" id="viewTabs" role="group" aria-label="Pane">
-            <button type="button" data-view="editor" aria-current="true">
-                Editor
-            </button>
-
-            <button type="button" data-view="output">Output</button>
-        </nav>
-
-        <main data-view="editor">
+        <main>
             <div class="pane" id="editorPane">
                 <div
                     class="toolbar"
@@ -278,50 +338,22 @@
 
                     <div class="sep"></div>
 
-                    <button
-                        type="button"
-                        id="clearBtn"
-                        aria-label="Clear the entry"
-                    >
-                        Clear
-                    </button>
-
                     <!--
-                        Shown only while there is a cleared entry to swap
-                        back, which updateRestoreButton() decides: a recovery
-                        offer when one exists, and nothing to read past when
-                        there is not. It starts hidden because the slot starts
-                        empty.
+                        The copy the loop wants without a dialog in between:
+                        the markup is taken straight from the entry. The caret
+                        opens the menu holding the one preference that changes
+                        what a copy does, shared with the preview's control.
                     -->
-                    <button
-                        type="button"
-                        id="restoreBtn"
-                        aria-label="Restore the entry you cleared"
-                        hidden
-                    >
-                        Restore
-                    </button>
-
-                    <div class="sep" id="toolbarCopySep" hidden></div>
-
-                    <!--
-                        The copy control moves into the toolbar with the same
-                        split shape it has beside the output, so the preference
-                        stays reachable while the output pane is collapsed.
-                    -->
-                    <div
-                        class="dropdown copy-dropdown"
-                        id="toolbarCopyDropdown"
-                        hidden
-                    >
+                    <div class="dropdown copy-dropdown" id="toolbarCopyDropdown">
                         <button
                             type="button"
                             id="toolbarCopyBtn"
+                            class="copy-button"
                             data-cmd="copyOutput"
                             aria-label="Copy"
                             disabled
                         >
-                            Copy
+                            Copy [markdown]
                         </button>
 
                         <button
@@ -349,15 +381,6 @@
                             </button>
                         </div>
                     </div>
-
-                    <button
-                        type="button"
-                        id="showOutputBtn"
-                        aria-label="Show output pane"
-                        hidden
-                    >
-                        Output
-                    </button>
                 </div>
 
                 <!--
@@ -377,39 +400,40 @@
                     spellcheck="true"
                 ></div>
             </div>
+        </main>
 
-            <div
-                class="split-divider"
-                id="splitDivider"
-                role="separator"
-                aria-orientation="vertical"
-                aria-label="Resize editor and output panes"
-            ></div>
+        <!--
+            The journal field as ServiceNow renders it, opened on demand. Nothing
+            is rendered into it while it is closed: it is read once the entry is
+            written, and rebuilding it on every keystroke for a viewport that
+            nobody is looking at is work for nothing. It is rendered as it opens
+            instead, so it can never show a stale entry.
+        -->
+        <dialog
+            id="previewDialog"
+            class="preview-dialog"
+            aria-labelledby="previewLabel"
+        >
+            <div class="preview-box">
+                <div class="pane-head">
+                    <span id="previewLabel">Work notes</span>
 
-            <div class="pane" id="outputPane">
-                <div class="output-head">
-                    <span id="outputLabel">ServiceNow journal output</span>
-
-                    <div class="output-actions">
-                        <button
-                            type="button"
-                            id="hideOutputBtn"
-                            aria-label="Hide output pane"
-                        >
-                            Hide
-                        </button>
+                    <div class="pane-actions">
+                        <button type="button" id="previewClose">Close</button>
 
                         <!--
                             Copy is a split control: the label copies, and the
                             caret opens the menu holding the one preference
-                            that changes what a copy does. The setting lives on
-                            the button it changes rather than in a checkbox of
-                            its own.
+                            that changes what a copy does. It lives in this head
+                            too because a modal covers the page, so the copy the
+                            reader wants while the preview is up has to be in
+                            it. The setting is the toolbar's setting too.
                         -->
                         <div class="dropdown copy-dropdown" id="copyDropdown">
                             <button
                                 type="button"
                                 id="copyBtn"
+                                class="copy-button"
                                 data-cmd="copyOutput"
                                 aria-label="Copy"
                                 disabled
@@ -445,30 +469,15 @@
                     </div>
                 </div>
 
-                <!--
-                    tabindex makes the pane reachable from the keyboard, and no
-                    live region: it is rewritten on every keystroke, and a
-                    screen reader announcing the whole entry each time is worse
-                    than making the user read what they want to hear.
-                -->
-                <pre
-                    id="output"
-                    data-empty="Markup appears here as you type."
-                    aria-labelledby="outputLabel"
-                    tabindex="0"
-                ></pre>
-
-                <!--
-                    Filled by render(). An entry that is pasted into a journal
-                    field is cut at the field's length, and the field gives no
-                    warning of its own, so the size is shown here. It sits in
-                    the pane's bottom corner, dimmed, rather than in the row
-                    above: it is read when it is wanted and not while typing.
-                    Empty when there is nothing to count, which hides it.
-                -->
-                <p class="output-stats" id="outputStats"></p>
+                <div class="mirror-body" id="mirrorBody">
+                    <div
+                        class="mirror-field"
+                        id="mirror"
+                        data-empty="Nothing to preview yet."
+                    ></div>
+                </div>
             </div>
-        </main>
+        </dialog>
 
         <dialog
             id="linkDialog"
@@ -537,6 +546,33 @@
                     </button>
                 </div>
             </div>
+        </dialog>
+
+        <dialog
+            id="nameDialog"
+            class="name-dialog"
+            aria-labelledby="nameDialogTitle"
+        >
+            <form id="nameForm" class="name-form">
+                <h2 id="nameDialogTitle">Save message</h2>
+
+                <label for="nameInput">Name</label>
+                <input
+                    id="nameInput"
+                    name="name"
+                    type="text"
+                    autocomplete="off"
+                    spellcheck="false"
+                    maxlength="120"
+                />
+
+                <div class="dialog-actions">
+                    <button type="button" id="nameCancel">Cancel</button>
+                    <button type="submit" class="primary" id="nameSubmit">
+                        Save
+                    </button>
+                </div>
+            </form>
         </dialog>
 
         <script src="app.js"></script>

@@ -8,11 +8,8 @@
     --accent: #1a7f37;
     /* Text and glyphs on an accent fill. */
     --accent-ink: #111;
-    /* The code wells: the editor's pre and code, the output pane, a dialog input. */
+    /* The code wells: the editor's pre and code, and a dialog input. */
     --code-bg: #14161a;
-    /* The [code] regions in the output pane. Warm amber, distinct from the
-       green accent so the two are not read as the same kind of thing. */
-    --code-ink: #e9bd5e;
     /* A copy failure and a rejected link URL. */
     --danger: #e5534b;
     --muted: #9aa1ab;
@@ -35,7 +32,6 @@
         --accent: #1a7f37;
         --accent-ink: #ffffff;
         --code-bg: #f0f2f5;
-        --code-ink: #8a5a00;
         --danger: #b3261e;
         --muted: #5b636d;
     }
@@ -51,22 +47,22 @@
 
 /*
  * The chrome is not text to read or copy: the page header and its subtext,
- * the formatting toolbar and the menus it opens, the output pane's head, the
- * pane switcher, and the dialog headings and buttons. Without this, a drag
- * that starts on a label paints a selection highlight over the control being
- * pressed, which reads as a stuck state. The editor and the output keep the
- * default, since selecting them is how the entry leaves the app.
+ * the formatting toolbar and the menus it opens, the preview's head, and the
+ * dialog headings and buttons. Without this, a drag that starts on a label
+ * paints a selection highlight over the control being pressed, which reads as
+ * a stuck state. The editor keeps the default, since selecting it is how the
+ * entry leaves the app.
  *
  * -webkit- is for Safari before 16.4, which only knows the prefixed form.
  */
 header,
 .toolbar,
 .dropdown-menu,
-.output-head,
-.view-tabs,
+.pane-head,
 .dialog-actions,
 .link-form h2,
-.shortcut-form h2 {
+.shortcut-form h2,
+.name-form h2 {
     -webkit-user-select: none;
     user-select: none;
 }
@@ -146,11 +142,31 @@ header span {
     color: var(--accent);
 }
 
+/*
+ * One column, centered, at every width. The editor card is the whole of it:
+ * the field is opened as a dialog, so it takes no height from the surface the
+ * entry is actually written on.
+ *
+ * The stray-space check is arithmetic, not a design number: a 760px column
+ * with a 32px margin on each side needs 824px, and narrower than that the
+ * margin would be the smaller loss if it went, so the column takes the width
+ * and keeps its gutters.
+ */
 main {
     flex: 1;
-    display: grid;
-    grid-template-columns: minmax(220px, var(--editor-w, 1fr)) 6px minmax(220px, 1fr);
+    display: flex;
+    flex-direction: column;
+    align-self: center;
+    width: 100%;
+    max-width: 760px;
     min-height: 0;
+    padding: 20px;
+}
+
+@media (max-width: 823px) {
+    main {
+        max-width: none;
+    }
 }
 
 .pane {
@@ -158,88 +174,43 @@ main {
     flex-direction: column;
     min-height: 0;
     /*
-     * A column is 1fr, and 1fr's automatic minimum is the item's min-content
-     * width: one unbreakable line in either pane would otherwise widen the
-     * column and push the whole layout off screen. Zeroed, the panes keep
-     * their half and the long line scrolls inside its own well instead.
+     * A flex child's automatic minimum is its min-content width: one
+     * unbreakable line in the editor would otherwise widen the card and push
+     * the column off screen. Zeroed, the card keeps its width and the long
+     * line scrolls inside its own well instead.
      */
     min-width: 0;
 }
 
 /*
- * The divider is the only separator between the two panes. It is a wide,
- * invisible grab strip whose centre line is the visual boundary, so it reads
- * as one thin line but gives the pointer a target worth catching.
+ * The editor is the column's one growing card: it takes the column's height,
+ * and a long entry scrolls inside it rather than growing the page. The border
+ * is what makes it read as a card now that a divider no longer separates it
+ * from anything.
+ *
+ * Nothing here clips. The toolbar's menus open over the editor, and where the
+ * toolbar wraps, the right-aligned copy menu reaches past the card's own edge;
+ * clipping the card to round its corners would cut that menu off instead. The
+ * toolbar rounds its own top corners to sit inside the border.
  */
-.split-divider {
-    position: relative;
-    cursor: col-resize;
-    background: var(--bg);
-    touch-action: none;
-    /* Fades away in step with the column collapse, and the delayed
-       visibility keeps it out of the tab ring once it has gone. */
-    transition:
-        opacity 240ms ease,
-        visibility 240ms ease;
-}
-
-.split-divider::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 50%;
-    width: 1px;
-    transform: translateX(-50%);
-    background: var(--border);
-}
-
-.split-divider:hover::after,
-.split-divider.is-dragging::after {
-    width: 2px;
-    background: var(--accent);
+#editorPane {
+    flex: 1 1 auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
 }
 
 /*
- * Collapsing the output is a desktop gesture. The narrow layout already has
- * its own pane switcher, so the divider and the collapse controls stay out
- * of it and the collapse class is scoped to the wide layout only.
- *
- * The class holds the final state and fades the pane. The column change that
- * moves the divider is animated from JavaScript with a matching duration, so
- * the fade and the slide leave and return together. visibility is delayed
- * rather than instant: on the way out it flips at the end, once the fade has
- * finished, and on the way back it flips at once so the pane is reachable the
- * moment it starts to reappear.
+ * The toolbar is the card's first child, so its panel fill would otherwise
+ * square off the curve it sits inside. Inheriting the card's radius keeps the
+ * two corners in step without a number that has to be kept in step by hand.
  */
-@media (min-width: 801px) {
-    main.output-collapsed {
-        grid-template-columns: minmax(220px, 1fr) 0px 0px;
-    }
-
-    main.output-collapsed #outputPane,
-    main.output-collapsed .split-divider {
-        opacity: 0;
-        visibility: hidden;
-        overflow: hidden;
-        pointer-events: none;
-    }
-}
-
-@media (max-width: 800px) {
-    .split-divider,
-    #hideOutputBtn,
-    #showOutputBtn {
-        display: none;
-    }
-}
-
 .toolbar {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
     padding: 8px 12px;
     border-bottom: 1px solid var(--border);
+    border-radius: inherit;
     background: var(--panel);
 }
 
@@ -396,9 +367,8 @@ main {
     white-space: pre-wrap;
     /*
      * A long unbroken run, a URL or a base64 blob, has no soft wrap
-     * opportunity inside it, so without this its width becomes the pane's
-     * minimum and the whole two-column layout is pushed off screen. The
-     * output pane already breaks anywhere; the editor has to agree.
+     * opportunity inside it, so without this its width becomes the card's
+     * minimum and the whole column is pushed off screen.
      */
     overflow-wrap: anywhere;
 }
@@ -413,7 +383,6 @@ main {
     position: absolute;
     color: var(--muted);
     pointer-events: none;
-    /* Matches the output pane's placeholder so both empty states read alike. */
     font-family: var(--mono);
     font-size: 13px;
 }
@@ -470,73 +439,32 @@ main {
     color: var(--accent);
 }
 
-.output-head {
+/*
+ * The head of a panel: what the surface below it is, and the controls that act
+ * on it. The preview's read surface wears it, so it reads as the app framing a
+ * surface rather than as a different kind of chrome.
+ */
+.pane-head {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 8px;
     padding: 8px 12px;
     border-bottom: 1px solid var(--border);
+    border-radius: inherit;
     background: var(--panel);
     color: var(--muted);
     font-size: 13px;
 }
 
-/*
- * The feed size sits in the pane's bottom corner, out of the line of sight
- * while typing: small, dimmed, and out of the code well's flow. The box is
- * packed onto its own text, so the hover that raises it covers the numbers
- * and nothing else. An over-limit entry is the exception, since a paste that
- * gets cut is worth interrupting for.
- *
- * The row is always in the layout and only the text fades in, so the well
- * above it keeps its height and the first keystroke does not move anything.
- */
-.output-stats {
-    /* Fit-content plus the auto margin parks the text against the pane's
-       right edge, at the same inset the code well uses. The vertical margin
-       is the row's spacing, so the box itself is only ever the text. */
-    width: fit-content;
-    margin: 4px 20px 6px auto;
-    padding: 0;
-    color: var(--muted);
-    font-size: 11px;
-    text-align: right;
-    /* Digits keep one width, so the corner does not shuffle as the entry grows. */
-    font-variant-numeric: tabular-nums;
-    /*
-     * An empty box has no line to give it height, which would leave the row
-     * shorter until the first digit lands and move the well above it. One
-     * line's height is held instead, filled or not.
-     */
-    line-height: 15px;
-    min-height: 1lh;
-    opacity: 0;
-    transition: opacity 160ms ease;
-}
-
-/* An empty entry has nothing to count, so the digits simply stay invisible. */
-.output-stats:not(:empty) {
-    opacity: 0.5;
-}
-
-.output-stats:hover {
-    opacity: 1;
-}
-
-.output-stats.is-over {
-    color: var(--danger);
-    font-weight: 600;
-    opacity: 1;
-}
-
-.output-actions {
+.pane-actions {
     display: flex;
+    align-items: center;
     gap: 6px;
     margin-left: auto;
 }
 
-.output-actions button {
+.pane-actions button {
     padding: 5px 12px;
     border: 1px solid transparent;
     border-radius: 4px;
@@ -548,26 +476,15 @@ main {
 /*
  * Copy is a split control: the two halves share the accent fill and read as
  * one button. The caret half opens the menu holding the one preference that
- * changes what a copy does. The toggle is scoped through .copy-dropdown so it
- * outranks the panel and toolbar button rules, which would otherwise square
- * its corners and give it their own border and background.
+ * changes what a copy does. Both halves are scoped through .copy-dropdown so
+ * they outrank the panel and toolbar button rules, which would otherwise
+ * square the corners and give them their own border and background.
  */
 .copy-dropdown {
     display: flex;
 }
 
-/*
- * The flex row above outranks the user agent's display:none for [hidden], so
- * the toolbar copy control would sit beside the output one instead of
- * replacing it. This keeps exactly one Copy on screen: in the output head
- * while the pane is open, and in the toolbar once it is collapsed.
- */
-.copy-dropdown[hidden] {
-    display: none;
-}
-
-#copyBtn,
-#toolbarCopyBtn {
+.copy-dropdown .copy-button {
     border-radius: 4px 0 0 4px;
 }
 
@@ -595,10 +512,8 @@ main {
 }
 
 /* The caret mirrors the Copy half, so the split stays one control in every state. */
-#copyBtn:disabled + .copy-toggle,
-#copyBtn:disabled + .copy-toggle:hover,
-#toolbarCopyBtn:disabled + .copy-toggle,
-#toolbarCopyBtn:disabled + .copy-toggle:hover {
+.copy-button:disabled + .copy-toggle,
+.copy-button:disabled + .copy-toggle:hover {
     border-left-color: transparent;
     background: transparent;
     box-shadow: inset 0 0 0 1px var(--border);
@@ -606,29 +521,29 @@ main {
     filter: none;
 }
 
-#copyBtn.error + .copy-toggle,
-#toolbarCopyBtn.error + .copy-toggle {
+.copy-button.error + .copy-toggle {
     background: var(--danger);
     color: #fff;
 }
 
-/* Hide is secondary, so it takes the outlined treatment the toolbar buttons use
-   rather than falling back to the user agent's light button fill. */
-#hideOutputBtn {
+/* Close is secondary, so it takes the outlined treatment the toolbar buttons
+   use rather than falling back to the user agent's light button fill. */
+#previewClose {
     border-color: var(--border-strong);
     background: transparent;
     color: var(--text);
 }
 
-#hideOutputBtn:hover {
+#previewClose:hover {
     border-color: var(--accent);
     color: var(--accent);
 }
 
 /*
  * The menu hangs off a right-aligned control, so it opens leftward from the
- * button's edge. Its single item carries its own styling rather than borrowing
- * the toolbar buttons' rules, since the menu's other home is the output pane.
+ * button's edge; setCopyMenuOpen flips it rightward when leftward would leave
+ * the window. Its single item carries its own styling rather than borrowing
+ * the toolbar buttons' rules, since the menu's other home is a dialog head.
  */
 .copy-menu {
     left: auto;
@@ -681,8 +596,7 @@ main {
     color: var(--accent);
 }
 
-#copyBtn,
-#toolbarCopyBtn {
+.copy-dropdown .copy-button {
     /* Holds the resting label and the "Copied!" flash at one width.
        "Copy failed" is wider than this, so that one flash grows the
        button and shifts the caret half beside it. */
@@ -693,15 +607,12 @@ main {
     font-weight: 600;
 }
 
-#copyBtn:hover,
-#toolbarCopyBtn:hover {
+.copy-dropdown .copy-button:hover {
     filter: brightness(1.1);
 }
 
-#copyBtn:disabled,
-#copyBtn:disabled:hover,
-#toolbarCopyBtn:disabled,
-#toolbarCopyBtn:disabled:hover {
+.copy-dropdown .copy-button:disabled,
+.copy-dropdown .copy-button:disabled:hover {
     background: transparent;
     box-shadow: inset 0 0 0 1px var(--border);
     color: var(--muted);
@@ -709,73 +620,247 @@ main {
     filter: none;
 }
 
-#copyBtn.error,
-#toolbarCopyBtn.error {
+.copy-dropdown .copy-button.error {
     background: var(--danger);
     color: #fff;
 }
 
 /*
- * The pane carries the well's colour, so the code and the strip the stats
- * footer sits on read as one surface. The pane header keeps its own colour.
+ * The one read surface on demand: the journal field the entry will land in.
+ * It is wide and tall rather than form-sized, because it shows the entry and
+ * the entry is as long as it is.
  */
-#outputPane {
-    background: var(--code-bg);
-    /* The same fade and delayed visibility the divider uses, so the pane and
-       its divider leave and return together. */
-    transition:
-        opacity 240ms ease,
-        visibility 240ms ease;
+.preview-dialog {
+    padding: 0;
+    border: none;
+    background: transparent;
 }
 
-#output {
-    flex: 1;
-    overflow: auto;
-    margin: 0;
-    padding: 16px 20px;
-    background: var(--code-bg);
-    font-family: var(--mono);
-    font-size: 13px;
-    line-height: 1.5;
-    /* The editor inserts real tabs in code blocks; match their width here so
-       the two panes agree on how far a tab reaches. */
-    tab-size: 4;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
+.preview-dialog::backdrop {
+    background: rgb(0 0 0 / 55%);
 }
 
 /*
- * The hint is a pseudo-element, so the pane still reads as empty text: Copy
- * has nothing to take and the stats footer has no digits to draw.
+ * The box behind the field is the field's own white: it is only ever visible
+ * at the corners the head and the field's body do not cover, and what belongs
+ * there is the platform, not the page behind the dialog.
  */
-#output.is-empty::before {
+.preview-box {
+    display: flex;
+    flex-direction: column;
+    width: min(760px, 92vw);
+    height: min(72dvh, 640px);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    box-shadow: 0 12px 32px rgb(0 0 0 / 50%);
+    overflow: hidden;
+    background: #fff;
+}
+
+/* ---------- Work notes mirror ---------- */
+
+/*
+ * The mirror is the platform rather than the app. Its type, colour and spacing
+ * are fixed instead of themed, because a preview that followed the app's theme
+ * would not be showing what the journal field will look like; every value here
+ * is from the captured Polaris page in ex/jsonoutput3.json, which is the
+ * authority for this block.
+ *
+ * The app frames it: the dialog, its head row and the scroll well are the
+ * app's, and only what is inside the field is ServiceNow's.
+ */
+
+/*
+ * The page around the field. ServiceNow's own field div carries no padding and
+ * no colour of its own - the widget it sits in supplies the white and the
+ * inset - so the two are split the same way here, and the captured styles of
+ * that div are what #mirror is measured against.
+ */
+.mirror-body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 12px;
+    background: #fff;
+}
+
+.mirror-field {
+    color: rgb(16, 23, 26);
+    /*
+     * The platform's own reset leaves this at none, and it is inherited: the
+     * capture has none on everything that is not a list, while the UA sheet's
+     * disc and decimal still apply to ul and ol themselves. It has no visual
+     * effect outside a list item, and it is here because the capture is the
+     * authority for every value in this block.
+     */
+    list-style-type: none;
+    font-family: Lato, Arial, sans-serif;
+    font-size: 12px;
+    /* A ratio, not the 15px it works out to here: the captured headings each
+       take 1.25 of their own size (a 24px h1 on a 30px line), which an
+       inherited length would flatten to 15px for all of them. */
+    line-height: 1.25;
+}
+
+.mirror-field a {
+    color: rgb(25, 85, 190);
+    text-decoration: underline;
+}
+
+.mirror-field code {
+    font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+    font-size: 12px;
+}
+
+/*
+ * Headings, lists and blockquotes keep the browser defaults at this 12px base,
+ * which is what the capture shows: an h1 at 24px, a list at 40px of padding, a
+ * blockquote at a 12px margin with 40px on each side. Only the three elements
+ * ServiceNow customises are written out here.
+ */
+.mirror-field pre {
+    margin: 0 0 9px;
+    padding: 8.5px;
+    border: 1px solid rgb(204, 204, 204);
+    border-radius: 3px;
+    background: rgb(245, 245, 245);
+    color: rgb(74, 74, 74);
+    font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+    font-size: 12px;
+    /* The capture reads "normal" (17.15px in the Menlo face it measured), and
+       pre keeps its lines unwrapped: a long one scrolls the field. */
+    line-height: normal;
+    white-space: pre;
+}
+
+/*
+ * The empty field. A hint from the app rather than the platform, and grey
+ * enough to read as a placeholder against the white it sits on.
+ */
+.mirror-field.is-empty::before {
     content: attr(data-empty);
+    color: rgb(140, 145, 152);
+}
+
+/* ---------- Saved messages ---------- */
+
+/*
+ * Wider than the toggle it hangs from, and right-aligned: the toggle sits at
+ * the right edge of the header, so a left-aligned panel would leave the
+ * window. The width is capped against the window as well, so a narrow one
+ * still fits.
+ */
+.saved-menu {
+    left: auto;
+    right: 0;
+    width: min(22rem, calc(100vw - 32px));
+    gap: 6px;
+}
+
+.saved-empty {
+    margin: 0;
+    padding: 6px 8px;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+/*
+ * The list scrolls rather than the panel, so the footer stays put however many
+ * messages there are.
+ */
+.saved-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 45dvh;
+    overflow-y: auto;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.saved-item {
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+}
+
+/*
+ * The rows are buttons inside the header's actions, so they inherit its
+ * outlined treatment; a row is a list line rather than a control on a bar, so
+ * the border goes and the highlight comes instead.
+ */
+.saved-item button {
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.saved-item button:hover {
+    border-color: transparent;
+    background: rgb(from var(--accent) r g b / 0.18);
+    color: var(--accent);
+}
+
+/* The row is one target: name over preview, filling what the delete leaves. */
+.saved-insert {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 5px 8px;
+    text-align: left;
+}
+
+.saved-name {
+    font-size: 13px;
+}
+
+/* One line, however long the message is, so rows stay a fixed height. */
+.saved-preview {
+    color: var(--muted);
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.saved-delete {
+    flex: none;
+    padding: 0 8px;
     color: var(--muted);
 }
 
-/* Just the delimiters and what they hold, so the rest of the entry reads as
-   plain prose. */
-#output .code-region {
-    color: var(--code-ink);
+.saved-delete:hover {
+    border-color: var(--danger);
+    background: rgb(from var(--danger) r g b / 0.12);
+    color: var(--danger);
 }
 
-/* ---------- View tabs ---------- */
+/* The rule above outranks the user agent's display:none for [hidden]. */
+.saved-empty[hidden] {
+    display: none;
+}
+
+.saved-actions {
+    display: flex;
+    gap: 4px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border);
+}
 
 /*
- * The tabs exist for the narrow layout and are hidden everywhere else, where
- * both panes are on screen at once and there is nothing to choose between.
+ * The three footer actions share the row, so an import and an export read as
+ * the two halves of the same idea as the save they sit beside.
  */
-.view-tabs {
-    display: none;
-    gap: 4px;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--border);
-    background: var(--panel);
-}
-
-.view-tabs button {
+.saved-actions button {
     flex: 1;
-    padding: 5px 12px;
+    padding: 5px 8px;
     border: 1px solid var(--border-strong);
     border-radius: 4px;
     background: transparent;
@@ -785,35 +870,15 @@ main {
     cursor: pointer;
 }
 
-.view-tabs button[aria-current="true"] {
+.saved-actions button:hover {
     border-color: var(--accent);
-    background: rgb(from var(--accent) r g b / 0.18);
     color: var(--accent);
 }
 
-/*
- * One pane at a time. A phone keyboard leaves too little of a 50/50 split to
- * show either pane, so the other one is hidden rather than shrunk.
- */
-@media (max-width: 800px) {
-    .view-tabs {
-        display: flex;
-    }
-
-    main {
-        grid-template-columns: 1fr;
-        grid-template-rows: 1fr;
-    }
-
-    main[data-view="editor"] #outputPane,
-    main[data-view="output"] #editorPane {
-        display: none;
-    }
-
-    .pane {
-        border-right: none;
-        border-bottom: none;
-    }
+.saved-actions button:disabled {
+    border-color: var(--border);
+    color: var(--muted);
+    cursor: default;
 }
 
 /* ---------- Dialogs ---------- */
@@ -823,19 +888,22 @@ main {
  * lands on it rather than on the form is a click on the backdrop.
  */
 .link-dialog,
-.shortcut-dialog {
+.shortcut-dialog,
+.name-dialog {
     padding: 0;
     border: none;
     background: transparent;
 }
 
 .link-dialog::backdrop,
-.shortcut-dialog::backdrop {
+.shortcut-dialog::backdrop,
+.name-dialog::backdrop {
     background: rgb(0 0 0 / 55%);
 }
 
 .link-form,
-.shortcut-form {
+.shortcut-form,
+.name-form {
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -865,7 +933,8 @@ main {
 }
 
 .link-form h2,
-.shortcut-form h2 {
+.shortcut-form h2,
+.name-form h2 {
     margin: 0 0 6px;
     font-size: 15px;
 }
