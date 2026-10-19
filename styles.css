@@ -851,6 +851,7 @@ main {
 
 .saved-name {
     font-size: 13px;
+    font-weight: 600;
 }
 
 /* One line, however long the message is, so rows stay a fixed height. */
