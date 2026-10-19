@@ -5,44 +5,51 @@
     --border: #3a3f47;
     --border-strong: #7a818c;
     --text: #e4e7eb;
-    --accent: #1a7f37; /* was  */
+    --accent: #1a7f37;
     /* Text and glyphs on an accent fill. */
-    --accent-ink: #111;
+    --accent-ink: #fff;
+    /*
+     * Accent-coloured text (hover, pressed and current states, links). The
+     * accent itself is tuned to be a fill, and a fill that clears its ink can
+     * still be too dark to read as text on the page. Mixing it toward the
+     * theme's text keeps the hue and makes the result readable in both
+     * palettes, including for an accent chosen in Settings.
+     */
+    --accent-text: color-mix(in srgb, var(--accent) 55%, var(--text));
     /* The code wells: the editor's pre and code, and a dialog input. */
     --code-bg: #14161a;
     /* A copy failure and a rejected link URL. */
-    --danger: #e5534b;
+    --danger: #ff7b72;
     --muted: #9aa1ab;
     --mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
 }
 
 /*
- * The dark palette is the default, and the light one is the same set of
- * roles for a reader whose system asks for light. Both are declared here so
- * nothing below this block names a colour that has to change with them.
+ * Dark is the default whatever the system asks for; the toggle in the header
+ * reads the saved choice and writes data-theme on the root. The light palette
+ * is the same set of roles, so nothing below this block names a colour that
+ * has to change with the theme.
  */
-@media (prefers-color-scheme: light) {
-    :root {
-        color-scheme: light;
-        --bg: #f6f7f9;
-        --panel: #ffffff;
-        --border: #dcdfe4;
-        --border-strong: #9aa1ab;
-        --text: #1c1f24;
-        --accent: #1a7f37;
-        --accent-ink: #ffffff;
-        --code-bg: #f0f2f5;
-        --danger: #b3261e;
-        --muted: #5b636d;
-    }
+:root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --border: #dcdfe4;
+    --border-strong: #9aa1ab;
+    --text: #1c1f24;
+    --accent: #1a7f37;
+    --accent-ink: #ffffff;
+    --code-bg: #f0f2f5;
+    --danger: #b3261e;
+    --muted: #5b636d;
+}
 
-    .dropdown-menu {
-        box-shadow: 0 6px 16px rgb(0 0 0 / 18%);
-    }
+:root[data-theme="light"] .dropdown-menu {
+    box-shadow: 0 6px 16px rgb(0 0 0 / 18%);
+}
 
-    .notice {
-        box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
-    }
+:root[data-theme="light"] .notice {
+    box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
 }
 
 * {
@@ -145,7 +152,7 @@ header span {
 
 .header-actions button:hover {
     border-color: var(--accent);
-    color: var(--accent);
+    color: var(--accent-text);
 }
 
 .header-actions button:disabled,
@@ -250,7 +257,7 @@ main {
 
 .toolbar button:hover {
     border-color: var(--accent);
-    color: var(--accent);
+    color: var(--accent-text);
 }
 
 /*
@@ -274,7 +281,7 @@ main {
     /* The accent at a lower alpha, taken from the accent itself so a colour
        change reaches the pressed states too. */
     background: rgb(from var(--accent) r g b / 0.18);
-    color: var(--accent);
+    color: var(--accent-text);
     box-shadow: inset 0 0 0 1px var(--accent);
 }
 
@@ -380,7 +387,7 @@ main {
  */
 .dropdown-toggle.is-active {
     border-color: var(--accent);
-    color: var(--accent);
+    color: var(--accent-text);
 }
 
 .dropdown-menu {
@@ -412,7 +419,7 @@ main {
 .dropdown-menu button[aria-checked="true"] {
     border-color: var(--accent);
     background: rgb(from var(--accent) r g b / 0.18);
-    color: var(--accent);
+    color: var(--accent-text);
 }
 
 /*
@@ -546,7 +553,7 @@ main {
 }
 
 #editor a {
-    color: var(--accent);
+    color: var(--accent-text);
 }
 
 /*
@@ -568,7 +575,7 @@ main {
        sits invisibly on the copy button's own accent fill. Re-assert the
        derived ink so the label stays readable for any chosen accent. */
     color: var(--accent-ink);
-    filter: brightness(1.1);
+    filter: brightness(0.92);
 }
 
 .toolbar .copy-button:disabled,
@@ -828,7 +835,7 @@ main {
 .saved-item button:hover {
     border-color: transparent;
     background: rgb(from var(--accent) r g b / 0.18);
-    color: var(--accent);
+    color: var(--accent-text);
 }
 
 /* The row is one target: name over preview, filling what the delete leaves. */
@@ -894,7 +901,7 @@ main {
 
 .saved-actions button:hover {
     border-color: var(--accent);
-    color: var(--accent);
+    color: var(--accent-text);
 }
 
 .saved-actions button:disabled {
@@ -1012,7 +1019,7 @@ main {
 
 .dialog-actions button:hover {
     border-color: var(--accent);
-    color: var(--accent);
+    color: var(--accent-text);
 }
 
 .dialog-actions .primary {
@@ -1024,7 +1031,7 @@ main {
 
 .dialog-actions .primary:hover {
     color: var(--accent-ink);
-    filter: brightness(1.1);
+    filter: brightness(0.92);
 }
 
 /*
@@ -1068,7 +1075,7 @@ main {
 }
 
 .shortcut-keys {
-    color: var(--accent);
+    color: var(--accent-text);
     font-family: var(--mono);
     font-size: 12px;
     white-space: nowrap;
@@ -1086,6 +1093,32 @@ main {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+}
+
+/*
+ * The theme switch shows one icon: the sun while the page is dark (press for
+ * light), the moon while it is light. Both are in the markup so the swap is a
+ * display rule rather than DOM the script has to rebuild.
+ */
+#themeToggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#themeToggle .theme-icon {
+    display: block;
+    width: 14px;
+    height: 14px;
+}
+
+#themeToggle .theme-icon-moon,
+:root[data-theme="light"] #themeToggle .theme-icon-sun {
+    display: none;
+}
+
+:root[data-theme="light"] #themeToggle .theme-icon-moon {
+    display: block;
 }
 
 /* Two columns, wider than the single-field dialogs: the section list on the
@@ -1127,14 +1160,14 @@ main {
 
 .settings-nav-item:hover {
     background: rgb(from var(--accent) r g b / 0.18);
-    color: var(--accent);
+    color: var(--accent-text);
 }
 
 /* The current section reads as pressed, like a toolbar button in use. */
 .settings-nav-item[aria-current="true"] {
     border-color: var(--accent);
     background: rgb(from var(--accent) r g b / 0.18);
-    color: var(--accent);
+    color: var(--accent-text);
 }
 
 .settings-panels {
@@ -1209,5 +1242,5 @@ main {
 
 .settings-actions button:hover {
     border-color: var(--accent);
-    color: var(--accent);
+    color: var(--accent-text);
 }
