@@ -14,8 +14,22 @@ function normalizeBlockName(value) {
         .replace(/[<>]/g, "");
 }
 
+/*
+ * The element the toolbar state was last read from. A press on a control can
+ * clear a caret the browser has nowhere to paint, most visibly inside an
+ * empty inline code span, so the command falls back to the element that made
+ * the button active rather than acting on no selection at all.
+ */
+let lastSelectedElement = null;
+
 function updateToolbarState() {
     const selectedElement = getSelectedElement();
+
+    lastSelectedElement = selectedElement;
+
+    const caret = captureCaret();
+
+    if (caret) lastEditorCaret = caret;
 
     for (const button of toolbar.querySelectorAll("button")) {
         /* The heading control is a switch over levels, not an inline toggle. */

@@ -66,6 +66,13 @@ let undoStack = [];
 let undoIndex = -1;
 let undoTimer = null;
 
+/*
+ * The caret the toolbar last read. A press can clear a selection the browser
+ * has nowhere to paint, such as a caret inside an empty inline code span, and
+ * the press then has to put it back before the command runs.
+ */
+let lastEditorCaret = null;
+
 function flushSnapshot() {
     if (!undoTimer) return;
 

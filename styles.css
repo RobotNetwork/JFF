@@ -156,9 +156,9 @@ header span {
  * the field is opened as a dialog, so it takes no height from the surface the
  * entry is actually written on.
  *
- * The stray-space check is arithmetic, not a design number: a 760px column
- * with a 32px margin on each side needs 824px, and narrower than that the
- * margin would be the smaller loss if it went, so the column takes the width
+ * The stray-space check is arithmetic, not a design number: an 800px card
+ * with a 20px gutter on each side needs 840px, and narrower than that the
+ * gutter would be the smaller loss if it went, so the column takes the width
  * and keeps its gutters.
  */
 main {
@@ -167,14 +167,15 @@ main {
     flex-direction: column;
     align-self: center;
     width: 100%;
-    /* 800px minus the 20px side gutters leaves a 760px card, the width the
+    /* 840px minus the 20px side gutters leaves an 800px card. That width fits
+       the toolbar's Preview and Copy buttons on one row, and is the width the
        preview dialog opens at. */
-    max-width: 800px;
+    max-width: 840px;
     min-height: 0;
     padding: 20px;
 }
 
-@media (max-width: 823px) {
+@media (max-width: 863px) {
     main {
         max-width: none;
     }
@@ -587,7 +588,7 @@ main {
     position: relative;
     display: flex;
     flex-direction: column;
-    width: min(760px, 92vw);
+    width: min(800px, 92vw);
     /* A stub until there is anything to show: the box opens at 70px and grows
        with the entry, capping at the viewport share the full preview used. */
     min-height: 70px;

@@ -105,16 +105,6 @@
                 </button>
 
                 <!--
-                    The work notes field is opened rather than shown: it is a
-                    viewport's worth of height for something read once the
-                    entry is written, so it sits beside Save rather than in the
-                    column. Nothing is rendered into it until it is asked for.
-                -->
-                <button type="button" id="previewBtn" aria-haspopup="dialog">
-                    Preview
-                </button>
-
-                <!--
                     Hidden: Import is a button in the settings dialog and a
                     picker needs a file input behind it.
                 -->
@@ -383,6 +373,18 @@
                         disabled
                     >
                         Copy [formatted]
+                    </button>
+
+                    <!--
+                        The output view, in the row the entry is written from
+                        rather than the page header's far corner.
+                    -->
+                    <button
+                        type="button"
+                        id="previewBtn"
+                        aria-haspopup="dialog"
+                    >
+                        Preview
                     </button>
                 </div>
 

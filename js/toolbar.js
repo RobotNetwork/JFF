@@ -5,6 +5,19 @@
 /* ---------- Toolbar ---------- */
 
 toolbar.addEventListener("mousedown", (event) => {
+    /*
+     * A press on a control can clear a caret the browser has nowhere to paint
+     * before this handler runs. When the editor still holds focus, the caret
+     * the toolbar last read is put back so the command has a target.
+     */
+    if (
+        !window.getSelection().rangeCount &&
+        document.activeElement === editor &&
+        lastEditorCaret
+    ) {
+        applyCaret(lastEditorCaret);
+    }
+
     if (event.target.closest("#headingToggle")) {
         /*
          * The press is kept from moving focus so the editor selection
@@ -153,18 +166,21 @@ const commands = {
     formatBlock: {
         run: (value) => {
             /*
-             * Clicking the level already in use turns a heading off rather
-             * than reapplying it: an h2 that is already an h2 becomes a
-             * paragraph. A blockquote is not a level, so it never toggles.
+             * Clicking the block already in use turns it off rather than
+             * reapplying it: an h2 that is already an h2 becomes a paragraph,
+             * and so does a blockquote. The browser's own formatBlock cannot
+             * do the quote - handing it "p" inside a quote changes nothing -
+             * so the toggle rebuilds the block itself.
              */
-            const current = normalizeBlockName(
-                document.queryCommandValue("formatBlock"),
-            );
-            const off =
-                headingLevels.includes(value) &&
-                current === normalizeBlockName(value);
+            if (
+                isToggleBlock(value) &&
+                blockAtCaretMatches(value) &&
+                clearBlockFormatting(value)
+            ) {
+                return false;
+            }
 
-            return execCommand("formatBlock", off ? "p" : value);
+            return execCommand("formatBlock", value);
         },
         isActive: (value) =>
             normalizeBlockName(document.queryCommandValue("formatBlock")) ===
@@ -172,6 +188,28 @@ const commands = {
     },
     inlineCode: {
         run: () => {
+            /*
+             * The same button takes the span off again. A collapsed caret or
+             * a selection inside a span would otherwise be wrapped a second
+             * time, leaving nested code elements that only another click can
+             * undo.
+             */
+            const selection = window.getSelection();
+            const codes = selection.rangeCount
+                ? inlineCodesInRange(selection.getRangeAt(0))
+                : [];
+            const fallback = selection.rangeCount
+                ? null
+                : inlineCodeElement(lastSelectedElement);
+
+            if (fallback && !codes.includes(fallback)) codes.push(fallback);
+
+            if (codes.length) {
+                removeInlineCode(codes);
+
+                return false;
+            }
+
             wrapInlineCode();
 
             return false;
@@ -181,6 +219,36 @@ const commands = {
     },
     codeBlock: {
         run: () => {
+            /*
+             * formatBlock makes a paragraph *inside* the pre rather than
+             * replacing it, so clicking the button again rebuilds the block
+             * here: the code text becomes paragraphs and the pre goes.
+             */
+            const selection = window.getSelection();
+            const element = selection.rangeCount
+                ? getSelectedElement()
+                : lastSelectedElement;
+            const pre = element ? element.closest("pre") : null;
+
+            if (pre && editor.contains(pre)) {
+                const range = selection.rangeCount
+                    ? selection.getRangeAt(0)
+                    : null;
+                const start = range
+                    ? { node: range.startContainer, offset: range.startOffset }
+                    : null;
+                const end = range
+                    ? { node: range.endContainer, offset: range.endOffset }
+                    : null;
+                const paragraph = clearCodeBlock(pre);
+
+                if (!start || !restoreSelection(start, end)) {
+                    placeCaretInBlock(paragraph);
+                }
+
+                return false;
+            }
+
             document.execCommand("formatBlock", false, "pre");
             normalizeCodeBlocks(editor);
 
@@ -330,6 +398,172 @@ function wrapInlineCode() {
     selectedRange.selectNodeContents(code);
     selection.removeAllRanges();
     selection.addRange(selectedRange);
+}
+
+/*
+ * A block that has just been emptied gets the <br> it needs and puts the
+ * caret in front of it, so typing fills the block instead of leaving the
+ * blank line above the text.
+ */
+function placeCaretInBlock(block) {
+    if (block !== editor && !block.firstChild) {
+        block.appendChild(document.createElement("br"));
+    }
+
+    if (
+        block !== editor &&
+        block.childNodes.length === 1 &&
+        block.firstChild.nodeName === "BR"
+    ) {
+        placeCaret(block);
+    } else {
+        placeCaretAtEnd(block);
+    }
+}
+
+/* The block formats the toolbar toggles: a heading level or a quote. */
+function isToggleBlock(value) {
+    const tag = normalizeBlockName(value);
+
+    return headingLevels.includes(tag) || tag === "blockquote";
+}
+
+/* Whether the block at the caret is already the format the button names. */
+function blockAtCaretMatches(value) {
+    const selection = window.getSelection();
+    const element = selection.rangeCount
+        ? getSelectedElement()
+        : lastSelectedElement;
+    const block = element ? caretBlock(element) : null;
+
+    return Boolean(
+        block &&
+            block !== editor &&
+            block.nodeType === Node.ELEMENT_NODE &&
+            block.tagName.toLowerCase() === normalizeBlockName(value),
+    );
+}
+
+/*
+ * Takes a block format off every line the selection touches. Rebuilding the
+ * block rather than handing formatBlock a paragraph is what makes a quote
+ * toggle: inside a quote the browser command changes nothing, and a quote
+ * holding paragraphs has to be unwrapped rather than turned into a p.
+ */
+function clearBlockFormatting(value) {
+    const selection = window.getSelection();
+    const live = selection.rangeCount ? selection.getRangeAt(0) : null;
+    let range = live;
+
+    /*
+     * A press can clear a caret the browser has nowhere to paint. The block
+     * the button was active on is then selected as a whole, which is what
+     * clearing a block tag does anyway.
+     */
+    if (!range && lastSelectedElement) {
+        const block = caretBlock(lastSelectedElement);
+
+        if (block && block !== editor) {
+            range = document.createRange();
+            range.selectNodeContents(block);
+        }
+    }
+
+    if (!range) return false;
+
+    const start = live
+        ? { node: range.startContainer, offset: range.startOffset }
+        : null;
+    const end = live
+        ? { node: range.endContainer, offset: range.endOffset }
+        : null;
+    const lines = formattingLines(range).filter(
+        (line) =>
+            line.nodeType === Node.ELEMENT_NODE &&
+            line.tagName.toLowerCase() === normalizeBlockName(value),
+    );
+
+    if (!lines.length) return false;
+
+    let last = null;
+
+    for (const line of lines) {
+        last = clearBlockFormat(line) ?? last;
+    }
+
+    if (!start || !restoreSelection(start, end)) {
+        placeCaretInBlock(last ?? editor);
+    }
+
+    return true;
+}
+
+/*
+ * The reverse of a code block. formatBlock puts a paragraph inside the pre
+ * instead of replacing it, so the code text is rebuilt as paragraphs, with
+ * a break where each newline was.
+ */
+function clearCodeBlock(pre) {
+    const text = codeText(pre).replace(/^\n+|\n+$/g, "");
+    const paragraph = document.createElement("p");
+
+    text.split("\n").forEach((line, index) => {
+        if (index) paragraph.appendChild(document.createElement("br"));
+        if (line) paragraph.appendChild(document.createTextNode(line));
+    });
+
+    if (!paragraph.firstChild) {
+        paragraph.appendChild(document.createElement("br"));
+    }
+
+    pre.replaceWith(paragraph);
+
+    return paragraph;
+}
+
+/*
+ * The inline code spans the selection is in or covers. A span nested inside
+ * another one is left to the outer unwrap: removing the outer span removes
+ * the reason the inner one was made.
+ */
+function inlineCodesInRange(range) {
+    const start = inlineCodeElement(range.startContainer);
+    const end = inlineCodeElement(range.endContainer);
+
+    if (start && start === end) return [start];
+
+    const codes = [...editor.querySelectorAll("code")].filter(
+        (code) => !code.closest("pre") && range.intersectsNode(code),
+    );
+
+    return codes.filter(
+        (code) => !codes.some((other) => other !== code && other.contains(code)),
+    );
+}
+
+/*
+ * Unwraps the spans and leaves the caret where it was. An empty span has no
+ * text node for the selection to land on once the element is gone, so the
+ * block takes the caret instead, with the <br> an empty block needs.
+ */
+function removeInlineCode(codes) {
+    const selection = window.getSelection();
+    const range = selection.rangeCount ? selection.getRangeAt(0) : null;
+    const start = range
+        ? { node: range.startContainer, offset: range.startOffset }
+        : null;
+    let fallback = null;
+
+    for (const code of codes) {
+        fallback = code.parentNode ?? fallback;
+        unwrapElement(code);
+    }
+
+    if (range && !range.collapsed) return;
+
+    if (start && restoreSelection(start, start)) return;
+
+    placeCaretInBlock(caretBlock(fallback ?? editor) ?? editor);
 }
 
 /* The link an element sits in, or null. */

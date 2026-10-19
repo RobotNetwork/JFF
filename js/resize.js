@@ -13,11 +13,11 @@
 const editorMain = document.querySelector("main");
 
 /*
- * The resting width: an 800px main cap leaves a 760px card after the 20px
+ * The resting width: an 840px main cap leaves an 800px card after the 20px
  * side gutters, which is the width the preview dialog opens at. The card
  * cannot be dragged narrower than this.
  */
-const MIN_MAIN_MAX_WIDTH = 800;
+const MIN_MAIN_MAX_WIDTH = 840;
 
 function editorMainMaxWidth() {
     const inline = parseFloat(editorMain.style.maxWidth);
