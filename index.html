@@ -60,8 +60,7 @@
 
                     <div class="dropdown-menu saved-menu" id="savedMenu" hidden>
                         <p class="saved-empty" id="savedEmpty">
-                            No saved messages yet. Save one, or import an
-                            export.
+                            No saved messages yet. Save one.
                         </p>
 
                         <ul
@@ -75,17 +74,35 @@
                             <button type="button" id="savedSaveBtn">
                                 Save current
                             </button>
-
-                            <button type="button" id="savedImportBtn">
-                                Import
-                            </button>
-
-                            <button type="button" id="savedExportBtn">
-                                Export
-                            </button>
                         </div>
                     </div>
                 </div>
+
+                <!--
+                    Settings. A dialog rather than a dropdown: a setting is a
+                    label and a control beside it, which needs room a menu does
+                    not give. It sits beside Saved, the other header control
+                    that owns a preference, so the two read as one cluster.
+                -->
+                <button
+                    type="button"
+                    id="settingsBtn"
+                    aria-haspopup="dialog"
+                    aria-label="Settings"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        width="13"
+                        height="13"
+                        aria-hidden="true"
+                    >
+                        <path
+                            d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.4-2.5 1.6 1.2a.7.7 0 0 1 .2.9l-1.5 2.6a.7.7 0 0 1-.9.3l-1.9-.8a7.6 7.6 0 0 1-1.6.9l-.3 2a.7.7 0 0 1-.7.6h-3a.7.7 0 0 1-.7-.6l-.3-2a7.6 7.6 0 0 1-1.6-.9l-1.9.8a.7.7 0 0 1-.9-.3l-1.5-2.6a.7.7 0 0 1 .2-.9l1.6-1.2a7.6 7.6 0 0 1 0-1.8l-1.6-1.2a.7.7 0 0 1-.2-.9l1.5-2.6a.7.7 0 0 1 .9-.3l1.9.8a7.6 7.6 0 0 1 1.6-.9l.3-2a.7.7 0 0 1 .7-.6h3a.7.7 0 0 1 .7.6l.3 2a7.6 7.6 0 0 1 1.6.9l1.9-.8a.7.7 0 0 1 .9.3l1.5 2.6a.7.7 0 0 1-.2.9l-1.6 1.2a7.6 7.6 0 0 1 0 1.8Z"
+                            fill="currentColor"
+                        />
+                    </svg>
+                </button>
 
                 <!--
                     The work notes field is opened rather than shown: it is a
@@ -98,25 +115,15 @@
                 </button>
 
                 <!--
-                    Hidden, since Import is a button in the menu and a picker
-                    needs a file input behind it.
+                    Hidden: Import is a button in the settings dialog and a
+                    picker needs a file input behind it.
                 -->
                 <input
                     type="file"
-                    id="savedFile"
+                    id="importFile"
                     accept="application/json,.json"
                     hidden
                 />
-
-                <button
-                    type="button"
-                    id="shortcutBtn"
-                    data-cmd="help"
-                    aria-label="Keyboard shortcuts"
-                    aria-haspopup="dialog"
-                >
-                    ?
-                </button>
             </div>
         </header>
 
@@ -364,47 +371,19 @@
 
                     <!--
                         The copy the loop wants without a dialog in between:
-                        the markup is taken straight from the entry. The caret
-                        opens the menu holding the one preference that changes
-                        what a copy does, shared with the preview's control.
+                        the markup is taken straight from the entry. Its one
+                        preference, clear after copy, lives in Settings.
                     -->
-                    <div class="dropdown copy-dropdown" id="toolbarCopyDropdown">
-                        <button
-                            type="button"
-                            id="toolbarCopyBtn"
-                            class="copy-button"
-                            data-cmd="copyOutput"
-                            aria-label="Copy"
-                            disabled
-                        >
-                            Copy [formatted]
-                        </button>
-
-                        <button
-                            type="button"
-                            class="dropdown-toggle copy-toggle"
-                            id="toolbarCopyToggle"
-                            aria-haspopup="menu"
-                            aria-expanded="false"
-                            aria-label="Copy options"
-                        ></button>
-
-                        <div
-                            class="dropdown-menu copy-menu"
-                            role="menu"
-                            aria-labelledby="toolbarCopyToggle"
-                            hidden
-                        >
-                            <button
-                                type="button"
-                                role="menuitemcheckbox"
-                                class="clear-after-copy-item"
-                                aria-checked="false"
-                            >
-                                Clear after copy
-                            </button>
-                        </div>
-                    </div>
+                    <button
+                        type="button"
+                        id="toolbarCopyBtn"
+                        class="copy-button"
+                        data-cmd="copyOutput"
+                        aria-label="Copy"
+                        disabled
+                    >
+                        Copy [formatted]
+                    </button>
                 </div>
 
                 <div
@@ -517,26 +496,6 @@
         </dialog>
 
         <dialog
-            id="shortcutsDialog"
-            class="shortcut-dialog"
-            aria-labelledby="shortcutsTitle"
-        >
-            <div class="shortcut-form">
-                <h2 id="shortcutsTitle">Keyboard shortcuts</h2>
-
-                <ul class="shortcut-list" id="shortcutList" role="list"></ul>
-
-
-
-                <div class="dialog-actions">
-                    <button type="button" id="shortcutsClose" class="primary">
-                        Close
-                    </button>
-                </div>
-            </div>
-        </dialog>
-
-        <dialog
             id="nameDialog"
             class="name-dialog"
             aria-labelledby="nameDialogTitle"
@@ -563,6 +522,132 @@
             </form>
         </dialog>
 
+        <dialog
+            id="settingsDialog"
+            class="settings-dialog"
+            aria-labelledby="settingsTitle"
+        >
+            <div class="settings-form">
+                <h2 id="settingsTitle">Settings</h2>
+
+                <div class="settings-body">
+                    <!--
+                        The sections. One is current at a time; the content
+                        pane is what changes, so the list reads as a table of
+                        contents and the setting stays in place beside it.
+                    -->
+                    <ul
+                        class="settings-nav"
+                        id="settingsNav"
+                        role="list"
+                        aria-label="Settings sections"
+                    >
+                        <li>
+                            <button
+                                type="button"
+                                class="settings-nav-item"
+                                data-panel="appearance"
+                                aria-current="true"
+                            >
+                                Appearance
+                            </button>
+                        </li>
+
+                        <li>
+                            <button
+                                type="button"
+                                class="settings-nav-item"
+                                data-panel="messages"
+                            >
+                                Messages
+                            </button>
+                        </li>
+
+                        <li>
+                            <button
+                                type="button"
+                                class="settings-nav-item"
+                                data-panel="shortcuts"
+                            >
+                                Keyboard shortcuts
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="settings-panels">
+                        <section
+                            class="settings-panel"
+                            id="settingsPanel-appearance"
+                            data-panel="appearance"
+                        >
+                            <h3>Appearance</h3>
+
+                            <label class="settings-field">
+                                Accent colour
+                                <input
+                                    type="color"
+                                    id="accentInput"
+                                    value="#1a7f37"
+                                />
+                            </label>
+                        </section>
+
+                        <section
+                            class="settings-panel"
+                            id="settingsPanel-messages"
+                            data-panel="messages"
+                            hidden
+                        >
+                            <h3>Messages</h3>
+
+                            <label
+                                class="settings-check"
+                                title="Clear the entry after copying its formatted output."
+                            >
+                                <input
+                                    type="checkbox"
+                                    id="clearAfterCopyInput"
+                                />
+                                Clear after copy
+                            </label>
+
+                            <h4>Import / export frequently used messages</h4>
+
+                            <div class="settings-actions">
+                                <button type="button" id="importBtn">
+                                    Import
+                                </button>
+                                <button type="button" id="exportBtn">
+                                    Export
+                                </button>
+                            </div>
+                        </section>
+
+                        <section
+                            class="settings-panel"
+                            id="settingsPanel-shortcuts"
+                            data-panel="shortcuts"
+                            hidden
+                        >
+                            <h3>Keyboard shortcuts</h3>
+
+                            <ul
+                                class="shortcut-list"
+                                id="shortcutList"
+                                role="list"
+                            ></ul>
+                        </section>
+                    </div>
+                </div>
+
+                <div class="dialog-actions">
+                    <button type="button" id="settingsClose" class="primary">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </dialog>
+
         <!--
             Load order matters: each file needs the names declared above it.
             core.js first, io.js last (it is the start-up).
@@ -570,6 +655,7 @@
         <script src="js/core.js"></script>
         <script src="js/toolbar.js"></script>
         <script src="js/dialogs.js"></script>
+        <script src="js/settings.js"></script>
         <script src="js/toolbar-state.js"></script>
         <script src="js/markdown.js"></script>
         <script src="js/richtext.js"></script>

@@ -64,7 +64,6 @@ header,
 .dropdown-menu,
 .dialog-actions,
 .link-form h2,
-.shortcut-form h2,
 .name-form h2 {
     -webkit-user-select: none;
     user-select: none;
@@ -532,123 +531,29 @@ main {
 }
 
 /*
- * Copy is a split control: the two halves share the accent fill and read as
- * one button. The caret half opens the menu holding the one preference that
- * changes what a copy does. Both halves are scoped through .copy-dropdown so
- * they outrank the panel and toolbar button rules, which would otherwise
- * square the corners and give them their own border and background.
+ * Copy is the one accent-filled toolbar button: it is the action the tool
+ * exists to produce, so it reads as the primary control in the row. It is
+ * scoped through .toolbar so it outranks the toolbar button rules, which
+ * would otherwise give it their own border and background. Its one
+ * preference, clear after copy, lives in Settings.
  */
-.copy-dropdown {
-    display: flex;
-}
-
-.copy-dropdown .copy-button {
-    border-radius: 4px 0 0 4px;
-}
-
-.copy-dropdown .copy-toggle {
-    padding: 5px 8px;
-    border: none;
-    border-left: 1px solid rgb(0 0 0 / 25%);
-    /* Matches the divider on the left so the content box, and with it the
-       centred caret, sits on the button's true centre rather than half a pixel
-       to the right. Invisible, and the divider still reads as one line. */
-    border-right: 1px solid transparent;
-    border-radius: 0 4px 4px 0;
-    background: var(--accent);
-    color: var(--accent-ink);
-}
-
-.copy-dropdown .copy-toggle::after {
-    color: inherit;
-}
-
-.copy-dropdown .copy-toggle:hover {
-    border-left-color: rgb(0 0 0 / 25%);
-    color: var(--accent-ink);
-    filter: brightness(1.1);
-}
-
-/* The caret mirrors the Copy half, so the split stays one control in every state. */
-.copy-button:disabled + .copy-toggle,
-.copy-button:disabled + .copy-toggle:hover {
-    border-left-color: transparent;
-    background: transparent;
-    box-shadow: inset 0 0 0 1px var(--border);
-    color: var(--muted);
-    filter: none;
-}
-
-/*
- * The menu hangs off a right-aligned control, so it opens leftward from the
- * button's edge; setCopyMenuOpen flips it rightward when leftward would leave
- * the window. Its single item carries its own styling rather than borrowing
- * the toolbar buttons' rules.
- */
-.copy-menu {
-    left: auto;
-    right: 0;
-    /* Sized by its one item rather than a fixed 12rem, which left the panel
-       about twice the width of the Copy control it hangs from. max-content is
-       what does the sizing: an absolutely positioned box shrinks to fit its
-       containing block, and the control here is narrower than the item, so
-       without it the label wraps onto four lines. The item's text ("Clear
-       after copy") is the floor, so the panel stays wider than the button and
-       cannot be made exactly the same size. */
-    width: max-content;
-}
-
-.copy-menu button {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    padding: 5px 10px;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    background: transparent;
-    color: var(--text);
-    font-family: inherit;
-    font-size: 13px;
-    text-align: left;
-    cursor: pointer;
-}
-
-/* The checkmark is the state, so the item itself is not filled when checked. */
-.copy-menu button[aria-checked="true"] {
-    border-color: transparent;
-    background: transparent;
-    color: var(--text);
-}
-
-.copy-menu button::before {
-    width: 1em;
-    color: var(--accent);
-    content: "✓";
-    visibility: hidden;
-}
-
-.copy-menu button[aria-checked="true"]::before {
-    visibility: visible;
-}
-
-.copy-menu button:hover {
-    background: rgb(from var(--accent) r g b / 0.18);
-    color: var(--accent);
-}
-
-.copy-dropdown .copy-button {
+.toolbar .copy-button {
     border: none;
     background: var(--accent);
     color: var(--accent-ink);
     font-weight: 600;
 }
 
-.copy-dropdown .copy-button:hover {
+.toolbar .copy-button:hover {
+    /* The generic .toolbar button:hover recolours text to the accent, which
+       sits invisibly on the copy button's own accent fill. Re-assert the
+       derived ink so the label stays readable for any chosen accent. */
+    color: var(--accent-ink);
     filter: brightness(1.1);
 }
 
-.copy-dropdown .copy-button:disabled,
-.copy-dropdown .copy-button:disabled:hover {
+.toolbar .copy-button:disabled,
+.toolbar .copy-button:disabled:hover {
     background: transparent;
     box-shadow: inset 0 0 0 1px var(--border);
     color: var(--muted);
@@ -955,10 +860,7 @@ main {
     border-top: 1px solid var(--border);
 }
 
-/*
- * The three footer actions share the row, so an import and an export read as
- * the two halves of the same idea as the save they sit beside.
- */
+/* The one footer action; it stretches the row it sits in. */
 .saved-actions button {
     flex: 1;
     padding: 5px 8px;
@@ -989,22 +891,22 @@ main {
  * lands on it rather than on the form is a click on the backdrop.
  */
 .link-dialog,
-.shortcut-dialog,
-.name-dialog {
+.name-dialog,
+.settings-dialog {
     padding: 0;
     border: none;
     background: transparent;
 }
 
 .link-dialog::backdrop,
-.shortcut-dialog::backdrop,
-.name-dialog::backdrop {
+.name-dialog::backdrop,
+.settings-dialog::backdrop {
     background: rgb(0 0 0 / 55%);
 }
 
 .link-form,
-.shortcut-form,
-.name-form {
+.name-form,
+.settings-form {
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -1034,8 +936,8 @@ main {
 }
 
 .link-form h2,
-.shortcut-form h2,
-.name-form h2 {
+.name-form h2,
+.settings-form h2 {
     margin: 0 0 6px;
     font-size: 15px;
 }
@@ -1129,11 +1031,6 @@ main {
 
 /* ---------- Keyboard shortcut reference ---------- */
 
-.shortcut-form {
-    /* Wider than the link dialog: a chord and its name sit side by side. */
-    width: 26rem;
-}
-
 .shortcut-list {
     display: flex;
     flex-direction: column;
@@ -1162,8 +1059,136 @@ main {
     font-size: 13px;
 }
 
-.shortcut-note {
-    margin: 6px 0 0;
-    color: var(--muted);
+/* ---------- Settings ---------- */
+
+/* The gear is an icon button, not a glyph; the SVG is centred rather than
+   left to sit on the text baseline like the letter buttons beside it. */
+#settingsBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Two columns, wider than the single-field dialogs: the section list on the
+   left, the setting beside it on the right. */
+.settings-form {
+    width: 34rem;
+}
+
+.settings-body {
+    display: flex;
+    gap: 12px;
+}
+
+.settings-nav {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 11rem;
+    margin: 0;
+    padding: 0;
+    padding-right: 12px;
+    border-right: 1px solid var(--border);
+    list-style: none;
+}
+
+.settings-nav-item {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.settings-nav-item:hover {
+    background: rgb(from var(--accent) r g b / 0.18);
+    color: var(--accent);
+}
+
+/* The current section reads as pressed, like a toolbar button in use. */
+.settings-nav-item[aria-current="true"] {
+    border-color: var(--accent);
+    background: rgb(from var(--accent) r g b / 0.18);
+    color: var(--accent);
+}
+
+.settings-panels {
+    flex: 1;
+    min-width: 0;
+    min-height: 10rem;
+    padding-left: 12px;
+}
+
+.settings-panel h3 {
+    margin: 0;
+    font-size: 14px;
+}
+
+.settings-panel h4 {
+    margin: 12px 0 0;
     font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+/* The rule above outranks the user agent's display:none for [hidden]. */
+.settings-panel[hidden] {
+    display: none;
+}
+
+/* A panel control: a label over a control, spaced off the heading. */
+.settings-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+    font-size: 13px;
+}
+
+.settings-field input[type="color"] {
+    width: 3rem;
+    height: 2rem;
+    padding: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    background: var(--panel);
+    cursor: pointer;
+}
+
+/* The one checkbox preference: label and box on one line. */
+.settings-check {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 10px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.settings-actions {
+    display: flex;
+    gap: 4px;
+    margin-top: 10px;
+}
+
+.settings-actions button {
+    padding: 3px 8px;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.settings-actions button:hover {
+    border-color: var(--accent);
+    color: var(--accent);
 }

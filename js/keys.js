@@ -43,7 +43,7 @@ const editingShortcuts = [
     { key: "y", cmd: "redo", label: "Redo" },
     { key: "z", shift: true, cmd: "redo", label: "Redo" },
     { key: "c", alt: true, cmd: "copyOutput" },
-    { code: "Slash", cmd: "help" },
+    { code: "Slash", cmd: "help", label: "Keyboard shortcuts" },
 ];
 
 function matchesShortcut(shortcut, event) {

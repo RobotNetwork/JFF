@@ -201,14 +201,6 @@ document.addEventListener("mousedown", (event) => {
     if (!savedMenu.hidden && !event.target.closest("#savedDropdown")) {
         setSavedMenuOpen(false);
     }
-
-    for (const dropdown of copyDropdowns) {
-        const menu = dropdown.querySelector(".copy-menu");
-
-        if (!menu.hidden && !dropdown.contains(event.target)) {
-            setCopyMenuOpen(menu, dropdown.querySelector(".copy-toggle"), false);
-        }
-    }
 });
 
 /*
@@ -229,6 +221,4 @@ document.addEventListener("keydown", (event) => {
         closeHeadingMenu();
         headingToggle.focus();
     }
-
-    closeCopyMenus();
 });

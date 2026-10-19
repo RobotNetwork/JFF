@@ -304,19 +304,3 @@ function buildTooltips() {
         button.title = shortcut ? `${name} (${chordLabel(shortcut)})` : name;
     }
 }
-
-/*
- * showModal throws on a dialog that is already open, and the chord and the
- * button both arrive here, so the open state is checked rather than assumed.
- */
-function openShortcutsDialog() {
-    if (!shortcutsDialog.open) shortcutsDialog.showModal();
-}
-
-shortcutBtn.addEventListener("click", openShortcutsDialog);
-
-shortcutsClose.addEventListener("click", () => {
-    shortcutsDialog.close();
-});
-
-closeOnBackdrop(shortcutsDialog, () => shortcutsDialog.close());

@@ -4,19 +4,22 @@
 
 /* ---------- Import and export ---------- */
 
-savedImportBtn.addEventListener("click", () => {
+importBtn.addEventListener("click", () => {
     /* Cleared first, so choosing the same file twice still fires a change. */
-    savedFile.value = "";
-    savedFile.click();
+    importFile.value = "";
+    importFile.click();
 });
 
-savedFile.addEventListener("change", async () => {
-    const [file] = savedFile.files ?? [];
+importFile.addEventListener("change", async () => {
+    const [file] = importFile.files ?? [];
 
     if (file) await importSaved(file);
 });
 
 async function importSaved(file) {
+    /* The confirmation lands on the page, so the dialog is out of the way. */
+    settingsDialog.close();
+
     let incoming = null;
 
     try {
@@ -45,13 +48,14 @@ async function importSaved(file) {
 
     if (!writeSaved([...merged.values()])) return;
 
-    setSavedMenuOpen(false);
     showNotice(
         `Imported ${incoming.length} message${incoming.length === 1 ? "" : "s"}.`,
     );
 }
 
-savedExportBtn.addEventListener("click", () => {
+exportBtn.addEventListener("click", () => {
+    settingsDialog.close();
+
     const records = readSaved();
 
     if (records.length === 0) {
@@ -73,7 +77,6 @@ savedExportBtn.addEventListener("click", () => {
     /* Held for a moment, so the download has the blob before it is released. */
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 
-    setSavedMenuOpen(false);
     showNotice(
         `Exported ${records.length} message${records.length === 1 ? "" : "s"}.`,
     );
@@ -92,6 +95,8 @@ document.title = document.querySelector("header h1").textContent.trim();
 checkCommandCoverage();
 buildTooltips();
 buildShortcutList();
+restoreAccent();
+restoreClearAfterCopy();
 
 /*
  * A restored entry is the baseline the undo stack starts from, so it is in

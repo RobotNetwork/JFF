@@ -204,14 +204,13 @@ const commands = {
         },
     },
     /*
-     * The reference dialog, from the header button and the chord. It changes
-     * nothing in the entry; it is a command so the shortcut table can name it
-     * and the reference can list it, and its button lives outside the toolbar
-     * that table drives.
+     * The shortcut reference, now a Settings section. The chord lands there
+     * rather than on a dialog of its own; it changes nothing in the entry,
+     * and the command is here so the shortcut table can name it.
      */
     help: {
         run: () => {
-            openShortcutsDialog();
+            openSettingsDialogAt("shortcuts");
 
             return true;
         },

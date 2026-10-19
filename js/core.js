@@ -22,28 +22,27 @@ const linkTextRow = document.getElementById("linkTextRow");
 const linkError = document.getElementById("linkError");
 const linkCancel = document.getElementById("linkCancel");
 const linkRemove = document.getElementById("linkRemove");
-const shortcutBtn = document.getElementById("shortcutBtn");
-const shortcutsDialog = document.getElementById("shortcutsDialog");
 const shortcutList = document.getElementById("shortcutList");
-const shortcutsClose = document.getElementById("shortcutsClose");
-const copyDropdowns = [...document.querySelectorAll(".copy-dropdown")];
-const clearAfterCopyItems = [
-    ...document.querySelectorAll(".clear-after-copy-item"),
-];
 const savedDropdown = document.getElementById("savedDropdown");
 const savedToggle = document.getElementById("savedToggle");
 const savedMenu = document.getElementById("savedMenu");
 const savedEmpty = document.getElementById("savedEmpty");
 const savedList = document.getElementById("savedList");
 const savedSaveBtn = document.getElementById("savedSaveBtn");
-const savedImportBtn = document.getElementById("savedImportBtn");
-const savedExportBtn = document.getElementById("savedExportBtn");
-const savedFile = document.getElementById("savedFile");
+const importBtn = document.getElementById("importBtn");
+const exportBtn = document.getElementById("exportBtn");
+const importFile = document.getElementById("importFile");
 const nameDialog = document.getElementById("nameDialog");
 const nameForm = document.getElementById("nameForm");
 const nameInput = document.getElementById("nameInput");
 const nameCancel = document.getElementById("nameCancel");
 const nameSubmit = document.getElementById("nameSubmit");
+const settingsBtn = document.getElementById("settingsBtn");
+const settingsDialog = document.getElementById("settingsDialog");
+const settingsNav = document.getElementById("settingsNav");
+const settingsClose = document.getElementById("settingsClose");
+const accentInput = document.getElementById("accentInput");
+const clearAfterCopyInput = document.getElementById("clearAfterCopyInput");
 
 /*
  * The toolbar's Copy button is the one copy control. render() disables it
