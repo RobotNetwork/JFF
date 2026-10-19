@@ -125,7 +125,11 @@ header span {
     font-size: 13px;
 }
 
+/* The header actions share one minimum height so the icon-only Settings
+   button matches the text Saved button beside it. A minimum rather than a
+   fixed height keeps a button whose content outgrows 28px unclipped. */
 .header-actions button {
+    min-height: 28px;
     padding: 4px 10px;
     border: 1px solid var(--border-strong);
     border-radius: 4px;
@@ -278,6 +282,17 @@ main {
     background: rgb(from var(--accent) r g b / 0.25);
 }
 
+/* Icon-like toolbar buttons centre their glyphs on both axes rather than
+   resting them on the text baseline, so the link, inline code and quote
+   controls read like the letter buttons beside them. */
+.toolbar button[data-cmd="link"],
+.toolbar button[data-cmd="inlineCode"],
+.toolbar button[data-cmd="formatBlock"][data-val="blockquote"] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .toolbar .sep {
     width: 1px;
     margin: 2px 4px;
@@ -408,6 +423,9 @@ main {
  */
 #headingToggle {
     width: 6.5rem;
+    /* The label sits left and the caret right; the fixed width keeps the
+       control from resizing as the label changes level. */
+    justify-content: space-between;
 }
 
 #headingMenu {
