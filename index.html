@@ -144,6 +144,15 @@
         <main>
             <div class="pane" id="editorPane">
                 <div
+                    class="resize-handle resize-handle-left"
+                    aria-hidden="true"
+                ></div>
+                <div
+                    class="resize-handle resize-handle-right"
+                    aria-hidden="true"
+                ></div>
+
+                <div
                     class="toolbar"
                     id="toolbar"
                     role="toolbar"
@@ -230,7 +239,7 @@
                                 data-cmd="formatBlock"
                                 data-val="h1"
                             >
-                                H1
+                                Heading 1
                             </button>
 
                             <button
@@ -241,7 +250,7 @@
                                 data-cmd="formatBlock"
                                 data-val="h2"
                             >
-                                H2
+                                Heading 2
                             </button>
 
                             <button
@@ -252,7 +261,7 @@
                                 data-cmd="formatBlock"
                                 data-val="h3"
                             >
-                                H3
+                                Heading 3
                             </button>
 
                             <button
@@ -263,7 +272,7 @@
                                 data-cmd="formatBlock"
                                 data-val="h4"
                             >
-                                H4
+                                Heading 4
                             </button>
 
                             <button
@@ -274,7 +283,7 @@
                                 data-cmd="formatBlock"
                                 data-val="h5"
                             >
-                                H5
+                                Heading 5
                             </button>
 
                             <button
@@ -285,7 +294,7 @@
                                 data-cmd="formatBlock"
                                 data-val="h6"
                             >
-                                H6
+                                Heading 6
                             </button>
                         </div>
                     </div>
@@ -368,7 +377,7 @@
                             aria-label="Copy"
                             disabled
                         >
-                            Copy [markdown]
+                            Copy [formatted]
                         </button>
 
                         <button
@@ -572,6 +581,7 @@
         <script src="js/paste.js"></script>
         <script src="js/util.js"></script>
         <script src="js/events.js"></script>
+        <script src="js/resize.js"></script>
         <script src="js/copy-menu.js"></script>
         <script src="js/preview.js"></script>
         <script src="js/saved.js"></script>

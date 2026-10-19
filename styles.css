@@ -5,7 +5,7 @@
     --border: #3a3f47;
     --border-strong: #7a818c;
     --text: #e4e7eb;
-    --accent: #1a7f37;
+    --accent: #1a7f37; /* was  */
     /* Text and glyphs on an accent fill. */
     --accent-ink: #111;
     /* The code wells: the editor's pre and code, and a dialog input. */
@@ -168,7 +168,9 @@ main {
     flex-direction: column;
     align-self: center;
     width: 100%;
-    max-width: 760px;
+    /* 800px minus the 20px side gutters leaves a 760px card, the width the
+       preview dialog opens at. */
+    max-width: 800px;
     min-height: 0;
     padding: 20px;
 }
@@ -204,6 +206,7 @@ main {
  * toolbar rounds its own top corners to sit inside the border.
  */
 #editorPane {
+    position: relative;
     flex: 1 1 auto;
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -387,7 +390,7 @@ main {
 }
 
 .dropdown-menu button {
-    min-width: 0;
+    width: max-content;
     text-align: left;
 }
 
@@ -395,6 +398,53 @@ main {
     border-color: var(--accent);
     background: rgb(from var(--accent) r g b / 0.18);
     color: var(--accent);
+}
+
+/*
+ * The heading control reserves a fixed width for its widest label ("Heading
+ * 6") plus the caret, so the label changing level never moves the toolbar.
+ * The menu matches the toggle and its options fill the width instead of
+ * sizing to their own text.
+ */
+#headingToggle {
+    width: 6.5rem;
+}
+
+#headingMenu {
+    width: 6.5rem;
+}
+
+#headingMenu button {
+    width: 100%;
+    white-space: nowrap;
+}
+
+/*
+ * Drag strips on the card's two edges. They sit straddling the border so the
+ * grab is centred on it, and a hover tint plus the east-west cursor is the
+ * whole affordance. The drag widens the card in both directions, so it stays
+ * centred in the column.
+ */
+.resize-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 8px;
+    z-index: 2;
+    cursor: ew-resize;
+    touch-action: none;
+}
+
+.resize-handle-left {
+    left: -4px;
+}
+
+.resize-handle-right {
+    right: -4px;
+}
+
+.resize-handle:hover {
+    background: rgb(from var(--accent) r g b / 0.1);
 }
 
 #editor {

@@ -114,9 +114,9 @@ toolbar.addEventListener("keydown", (event) => {
 /* ---------- Heading dropdown ---------- */
 
 /*
- * One button in place of six. Its label carries the level the caret is on
- * and the menu marks the same item, so the control always shows what is in
- * use without spending a button per level.
+ * One button in place of the menu's items. Its label carries the level the
+ * caret is on and the menu marks the same item, so the control always shows
+ * what is in use without spending a button per level.
  */
 function headingLevelInUse() {
     const element = getSelectedElement();
@@ -129,15 +129,13 @@ function headingLevelInUse() {
 
 function updateHeadingControl() {
     const level = headingLevelInUse();
+    const levelNumber = headingLevels.indexOf(level) + 1;
 
-    headingToggle.textContent = level ? level.toUpperCase() : "Heading";
+    headingToggle.textContent = level ? `Heading ${levelNumber}` : "Heading";
     headingToggle.classList.toggle("is-active", Boolean(level));
 
     for (const item of headingMenu.querySelectorAll("button[data-val]")) {
-        item.setAttribute(
-            "aria-checked",
-            String(item.dataset.val === level),
-        );
+        item.setAttribute("aria-checked", String(item.dataset.val === level));
     }
 }
 

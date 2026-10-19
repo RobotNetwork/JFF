@@ -737,3 +737,165 @@ function formatLine(line, tag) {
 
     placeCaret(element);
 }
+
+/* ---------- Clearing formatting ---------- */
+
+/*
+ * The inline tags Clear formatting takes off. A code span and a link are
+ * meaning rather than appearance, so they stay.
+ */
+const clearedInlineSelector = [
+    ...boldTags,
+    ...italicTags,
+    ...strikeTags,
+    ...underlineTags,
+].join(", ");
+
+function isFormattingBlock(element) {
+    const tag = element.tagName.toLowerCase();
+
+    return headingLevels.includes(tag) || tag === "blockquote";
+}
+
+/*
+ * A quote can hold whole paragraphs, and those are blocks in their own right,
+ * so a quote holding blocks is unwrapped rather than turned into a <p> that
+ * would then hold them. Anything else becomes a paragraph, keeping its
+ * content; an empty block gets the <br> that gives the caret somewhere to sit.
+ */
+function clearBlockFormat(element) {
+    if (!isFormattingBlock(element)) return null;
+
+    if (element.querySelector(blockSelector)) {
+        unwrapElement(element);
+
+        return element.firstElementChild;
+    }
+
+    const paragraph = document.createElement("p");
+
+    while (element.firstChild) paragraph.appendChild(element.firstChild);
+
+    if (!paragraph.textContent && !paragraph.querySelector("br")) {
+        paragraph.appendChild(document.createElement("br"));
+    }
+
+    element.replaceWith(paragraph);
+
+    return paragraph;
+}
+
+/*
+ * The inline formatting inside a line. A line can itself be the wrapper - a
+ * bold run typed into an empty editor has no block around it - and a list
+ * item's nested lists are separate lines, so their inline tags are left to
+ * their own pass.
+ */
+function inlineFormatsIn(line) {
+    const formats = line.matches(clearedInlineSelector)
+        ? [line, ...line.querySelectorAll(clearedInlineSelector)]
+        : [...line.querySelectorAll(clearedInlineSelector)];
+
+    return formats.filter((inline) => {
+        const item = inline.closest("li");
+
+        return !item || item === line;
+    });
+}
+
+/*
+ * The lines Clear formatting rewrites: the line at a caret, and every block a
+ * selection touches. A block tag cannot be dropped from part of a line, so the
+ * lines are cleared whole.
+ */
+function formattingLines(range) {
+    if (range.collapsed) {
+        const line = caretBlock(range.startContainer);
+
+        return line && line !== editor ? [line] : [];
+    }
+
+    const lines = new Set();
+
+    for (const node of [range.startContainer, range.endContainer]) {
+        const line = caretBlock(node);
+
+        if (line && line !== editor) lines.add(line);
+    }
+
+    for (const element of editor.querySelectorAll(blockSelector)) {
+        if (range.intersectsNode(element)) lines.add(element);
+    }
+
+    return [...lines];
+}
+
+/*
+ * Clear formatting drops block formatting and character formatting together.
+ * The browser's own removeFormat only handles character formatting, and with a
+ * collapsed caret it leaves the document untouched, so a heading survived it
+ * and the button read as broken. Headings and quotes are turned back into
+ * paragraphs here; the inline tags the toolbar writes are unwrapped, and a
+ * ranged selection is handed to removeFormat, which splits a partly selected
+ * tag rather than clearing the whole of it.
+ */
+function clearFormatting() {
+    const selection = window.getSelection();
+
+    if (!selection.rangeCount) return;
+
+    const range = selection.getRangeAt(0);
+
+    if (!editor.contains(range.commonAncestorContainer)) return;
+
+    const collapsed = range.collapsed;
+    const lines = formattingLines(range);
+
+    if (!collapsed) document.execCommand("removeFormat");
+
+    /*
+     * The selection is read after the browser command, which splits the tags
+     * it partly covers, and kept as nodes rather than as a Range: moving a
+     * text node into its new block moves a Range's boundary out of it.
+     */
+    const live = window.getSelection().getRangeAt(0);
+    const start = { node: live.startContainer, offset: live.startOffset };
+    const end = { node: live.endContainer, offset: live.endOffset };
+
+    const cleared = lines.map((line) => {
+        if (collapsed) {
+            for (const inline of inlineFormatsIn(line)) unwrapElement(inline);
+        }
+
+        return clearBlockFormat(line) ?? (line.isConnected ? line : null);
+    });
+
+    if (restoreSelection(start, end)) return;
+
+    placeCaretAtEnd(cleared.findLast(Boolean) ?? editor);
+}
+
+/*
+ * Puts the caret back on the character it was on. The nodes survive an unwrap
+ * and a block change, so references to them are what stays true; a caret that
+ * sat on an element which was replaced has no node to return to and reports
+ * false.
+ */
+function restoreSelection(start, end) {
+    if (!editor.contains(start.node) || !editor.contains(end.node)) return false;
+
+    const selection = window.getSelection();
+    const range = document.createRange();
+
+    try {
+        range.setStart(start.node, Math.min(start.offset, nodeOffset(start.node)));
+        range.setEnd(end.node, Math.min(end.offset, nodeOffset(end.node)));
+    } catch {
+        return false;
+    }
+
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    return true;
+}

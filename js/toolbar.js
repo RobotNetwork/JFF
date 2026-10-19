@@ -151,7 +151,21 @@ const commands = {
         isActive: () => queryCommandState("insertOrderedList"),
     },
     formatBlock: {
-        run: (value) => execCommand("formatBlock", value),
+        run: (value) => {
+            /*
+             * Clicking the level already in use turns a heading off rather
+             * than reapplying it: an h2 that is already an h2 becomes a
+             * paragraph. A blockquote is not a level, so it never toggles.
+             */
+            const current = normalizeBlockName(
+                document.queryCommandValue("formatBlock"),
+            );
+            const off =
+                headingLevels.includes(value) &&
+                current === normalizeBlockName(value);
+
+            return execCommand("formatBlock", off ? "p" : value);
+        },
         isActive: (value) =>
             normalizeBlockName(document.queryCommandValue("formatBlock")) ===
             normalizeBlockName(value),
@@ -178,7 +192,17 @@ const commands = {
         run: () => insertLink(),
         isActive: (value, element) => Boolean(element.closest("a")),
     },
-    removeFormat: { run: () => execCommand("removeFormat") },
+    /*
+     * The browser command only clears character formatting and ignores a
+     * heading or a quote, so the editor's own version does both.
+     */
+    removeFormat: {
+        run: () => {
+            clearFormatting();
+
+            return false;
+        },
+    },
     /*
      * The reference dialog, from the header button and the chord. It changes
      * nothing in the entry; it is a command so the shortcut table can name it
