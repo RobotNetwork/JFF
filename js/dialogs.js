@@ -252,14 +252,40 @@ function chordLabel(shortcut) {
     return parts.join("+");
 }
 
-function buildShortcutList() {
-    const rows = [
-        ...editingShortcuts.map((shortcut) => [
-            chordLabel(shortcut),
-            shortcutName(shortcut),
-        ]),
-        ...extraShortcuts.map(({ keys, label }) => [keys, label]),
+/* The chord and name of a numbered run, as one entry. Six heading rows would
+   repeat the same chord shape, so the reference reads the range instead. */
+function shortcutRange(shortcut, count) {
+    const chord = chordLabel(shortcut);
+    const name = shortcutName(shortcut);
+
+    return [
+        `${chord.slice(0, chord.lastIndexOf("+") + 1)}1-${count}`,
+        `${name.replace(/\s*\d+$/, "")} 1-${count}`,
     ];
+}
+
+function buildShortcutList() {
+    const headingShortcuts = editingShortcuts.filter(
+        (shortcut) =>
+            shortcut.alt &&
+            shortcut.cmd === "formatBlock" &&
+            headingLevels.includes(shortcut.val),
+    );
+    const rows = [];
+
+    for (const shortcut of editingShortcuts) {
+        if (!headingShortcuts.includes(shortcut)) {
+            rows.push([chordLabel(shortcut), shortcutName(shortcut)]);
+        } else if (shortcut === headingShortcuts[0]) {
+            /*
+             * The table keeps one entry per heading level so matching stays
+             * exact; the reference shows the levels on one line.
+             */
+            rows.push(shortcutRange(shortcut, headingShortcuts.length));
+        }
+    }
+
+    rows.push(...extraShortcuts.map(({ keys, label }) => [keys, label]));
 
     for (const [keys, label] of rows) {
         const item = document.createElement("li");

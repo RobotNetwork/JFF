@@ -233,6 +233,12 @@ main {
 .toolbar {
     display: flex;
     flex-wrap: wrap;
+    /*
+     * The controls are one centered group, so the free space on either side is
+     * the same and a new button only widens the group rather than pushing it
+     * off to one edge. Wrapped lines centre too.
+     */
+    justify-content: center;
     gap: 4px;
     padding: 8px 12px;
     border-bottom: 1px solid var(--border);
@@ -454,9 +460,15 @@ main {
  */
 .resize-handle {
     position: absolute;
+    /*
+     * The tint runs the full height of the card. Rounding the ends keeps the
+     * strip from finishing as a square block at the top and bottom while it
+     * still reaches both edges.
+     */
     top: 0;
     bottom: 0;
     width: 8px;
+    border-radius: 4px;
     z-index: 2;
     cursor: ew-resize;
     touch-action: none;
