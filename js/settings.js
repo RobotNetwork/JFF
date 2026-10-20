@@ -25,6 +25,9 @@ function showSettingsPanel(name) {
 
 /* showModal throws on a dialog that is already open. */
 function openSettingsDialog() {
+    /* The tutorial checkbox is the inverse of the one in the walkthrough. */
+    syncTutorialPreference();
+
     if (!settingsDialog.open) settingsDialog.showModal();
 }
 
@@ -59,9 +62,9 @@ function validAccent(value) {
 }
 
 /*
- * The ink sits on an accent fill (the Copy button, a primary dialog button),
- * so it is derived rather than chosen: black or white, whichever clears WCAG
- * by more against the accent's relative luminance.
+ * The ink sits on an accent fill (a primary dialog button, the pressed
+ * toolbar state), so it is derived rather than chosen: black or white,
+ * whichever clears WCAG by more against the accent's relative luminance.
  */
 function accentInk(hex) {
     const value = hex.slice(1);
@@ -104,10 +107,29 @@ function restoreAccent() {
     applyAccent(validAccent(stored) ? stored : defaultAccent);
 }
 
+/*
+ * Reset drops the stored choice rather than writing the default into it, so
+ * an unset accent keeps following the default if it ever changes. The colour
+ * applies whether or not the store can be reached.
+ */
+function resetAccent() {
+    applyAccent(defaultAccent);
+
+    if (!storageAvailable()) return;
+
+    try {
+        window.localStorage.removeItem(accentKey);
+    } catch {
+        /* The default applies now; the stored choice only returns on reload. */
+    }
+}
+
 accentInput.addEventListener("input", () => {
     applyAccent(accentInput.value);
     persistAccent(accentInput.value);
 });
+
+accentResetBtn.addEventListener("click", resetAccent);
 
 /* ---------- Clear after copy ---------- */
 

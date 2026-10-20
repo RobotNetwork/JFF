@@ -108,7 +108,14 @@ commitSnapshot();
 render();
 updateToolbarState();
 
+/* First run opens the walkthrough. Focusing the editor behind a modal would
+   take focus straight back out of it, so the caret is only placed when the
+   walkthrough is not up. */
+maybeShowTutorial();
+
 /* The tool's one job is a paste, so the caret is waiting for it. A phone gets
    no focus: a keyboard popped open on load is worse there than the one tap it
    saves. */
-if (matchMedia("(min-width: 801px)").matches) editor.focus();
+if (!tutorialDialog.open && matchMedia("(min-width: 801px)").matches) {
+    editor.focus();
+}

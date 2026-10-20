@@ -48,44 +48,6 @@
                 </span>
 
                 <!--
-                    Saved messages. A menu rather than a dialog: inserting one
-                    is the whole action and the list is what it is chosen from.
-                    The rows are rebuilt every time it opens, so the menu never
-                    holds a stale copy of the store.
-                -->
-                <div class="dropdown" id="savedDropdown">
-                    <button
-                        type="button"
-                        class="dropdown-toggle"
-                        id="savedToggle"
-                        aria-haspopup="true"
-                        aria-expanded="false"
-                        aria-controls="savedMenu"
-                    >
-                        Saved
-                    </button>
-
-                    <div class="dropdown-menu saved-menu" id="savedMenu" hidden>
-                        <p class="saved-empty" id="savedEmpty">
-                            No saved messages yet. Save one.
-                        </p>
-
-                        <ul
-                            class="saved-list"
-                            id="savedList"
-                            role="list"
-                            aria-label="Saved messages"
-                        ></ul>
-
-                        <div class="saved-actions">
-                            <button type="button" id="savedSaveBtn">
-                                Save current
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!--
                     The theme switch. A switch rather than a plain button:
                     light mode is either on or off, and the state is what a
                     screen reader should hear. The icon shows the mode the
@@ -412,35 +374,6 @@
                         ✕
                     </button>
 
-                    <div class="sep"></div>
-
-                    <!--
-                        The copy the loop wants without a dialog in between:
-                        the markup is taken straight from the entry. Its one
-                        preference, clear after copy, lives in Settings.
-                    -->
-                    <button
-                        type="button"
-                        id="toolbarCopyBtn"
-                        class="copy-button"
-                        data-cmd="copyOutput"
-                        aria-label="Copy"
-                        disabled
-                    >
-                        Copy [formatted]
-                    </button>
-
-                    <!--
-                        The output view, in the row the entry is written from
-                        rather than the page header's far corner.
-                    -->
-                    <button
-                        type="button"
-                        id="previewBtn"
-                        aria-haspopup="dialog"
-                    >
-                        Preview
-                    </button>
                 </div>
 
                 <div
@@ -452,6 +385,76 @@
                     aria-placeholder="Type or paste your journal entry here…"
                     spellcheck="true"
                 ></div>
+            </div>
+
+            <!--
+                The write-copy loop closes in one centered row beneath the
+                field, outside the card's border: the copy without a dialog
+                in between, the output view, and the saved messages. The rows
+                are rebuilt every time the menu opens, so it never holds a
+                stale copy of the store.
+            -->
+            <div class="editor-actions" id="editorActions">
+                <!--
+                    The copy the loop wants without a dialog in between: the
+                    markup is taken straight from the entry. Its one
+                    preference, clear after copy, lives in Settings.
+                -->
+                <button
+                    type="button"
+                    id="copyBtn"
+                    data-cmd="copyOutput"
+                    aria-label="Copy"
+                    disabled
+                >
+                    Copy [formatted]
+                </button>
+
+                <!-- The output view, opened over the entry. -->
+                <button type="button" id="previewBtn" aria-haspopup="dialog">
+                    Preview
+                </button>
+
+                <!--
+                    Saved messages. A menu rather than a dialog: inserting
+                    one is the whole action and the list is what it is
+                    chosen from.
+                -->
+                <div class="dropdown" id="savedDropdown">
+                    <button
+                        type="button"
+                        class="dropdown-toggle"
+                        id="savedToggle"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        aria-controls="savedMenu"
+                    >
+                        Saved
+                    </button>
+
+                    <div
+                        class="dropdown-menu saved-menu"
+                        id="savedMenu"
+                        hidden
+                    >
+                        <p class="saved-empty" id="savedEmpty">
+                            No saved messages yet. Save one.
+                        </p>
+
+                        <ul
+                            class="saved-list"
+                            id="savedList"
+                            role="list"
+                            aria-label="Saved messages"
+                        ></ul>
+
+                        <div class="saved-actions">
+                            <button type="button" id="savedSaveBtn">
+                                Save current
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
 
@@ -629,6 +632,16 @@
                                 Keyboard shortcuts
                             </button>
                         </li>
+
+                        <li>
+                            <button
+                                type="button"
+                                class="settings-nav-item"
+                                data-panel="tutorial"
+                            >
+                                How it works
+                            </button>
+                        </li>
                     </ul>
 
                     <div class="settings-panels">
@@ -647,6 +660,12 @@
                                     value="#1a7f37"
                                 />
                             </label>
+
+                            <div class="settings-actions">
+                                <button type="button" id="accentResetBtn">
+                                    Reset to default
+                                </button>
+                            </div>
                         </section>
 
                         <section
@@ -694,6 +713,96 @@
                                 role="list"
                             ></ul>
                         </section>
+
+                        <section
+                            class="settings-panel"
+                            id="settingsPanel-tutorial"
+                            data-panel="tutorial"
+                            hidden
+                        >
+                            <h3>How it works</h3>
+
+                            <p class="settings-note">
+                                Three screens: what the page does, what lands
+                                on the clipboard, and the Markdown it reads.
+                            </p>
+
+                            <div class="settings-actions">
+                                <button type="button" id="tutorialOpenBtn">
+                                    Open the guide
+                                </button>
+                            </div>
+
+                            <label class="settings-check">
+                                <input
+                                    type="checkbox"
+                                    id="tutorialStartInput"
+                                />
+                                Show on startup
+                            </label>
+
+                            <details class="settings-details">
+                                <summary>ServiceNow setup</summary>
+
+                                <p>
+                                    Three admin-controlled properties decide
+                                    whether the pasted markup renders. They
+                                    live in System Properties &gt; All
+                                    Properties
+                                    (<code>sys_properties.list</code>), or in
+                                    Instance Security Center.
+                                </p>
+
+                                <dl class="settings-props">
+                                    <dt>
+                                        <code
+                                            >glide.ui.security.allow_codetag</code
+                                        >
+                                    </dt>
+                                    <dd>
+                                        Renders HTML inside
+                                        <code>[code]</code> tags. Default
+                                        true; many security baselines set it
+                                        false, and the tags then appear as
+                                        plain text.
+                                    </dd>
+
+                                    <dt>
+                                        <code
+                                            >glide.html.sanitize_all_fields</code
+                                        >
+                                    </dt>
+                                    <dd>
+                                        Runs journal HTML through the
+                                        sanitizer, which removes disallowed
+                                        elements and attributes. The allow and
+                                        deny lists live in the
+                                        <code>HTMLSanitizerConfig</code>
+                                        script include under System Definition
+                                        &gt; Script Includes.
+                                    </dd>
+
+                                    <dt>
+                                        <code>glide.ui.journal.use_html</code>
+                                    </dt>
+                                    <dd>
+                                        Set to true to add a rich text editor
+                                        to journal fields in the Activity
+                                        stream. Optional; this page works
+                                        without it, and many large enterprises
+                                        leave it off because it changes the
+                                        field for everyone.
+                                    </dd>
+                                </dl>
+
+                                <p>
+                                    If a tag disappears after posting, the
+                                    sanitizer or <code>allow_codetag</code>
+                                    is the place to look. Scripts are never
+                                    part of the output.
+                                </p>
+                            </details>
+                        </section>
                     </div>
                 </div>
 
@@ -702,6 +811,150 @@
                         Close
                     </button>
                 </div>
+            </div>
+        </dialog>
+
+        <!--
+            The first-run walkthrough, and the same walkthrough reopened from
+            Settings. One step at a time keeps each idea on screen with the
+            screenshot that shows it; the body scrolls, so a short window does
+            not cut a step off.
+        -->
+        <dialog
+            id="tutorialDialog"
+            class="tutorial-dialog"
+            aria-labelledby="tutorialTitle"
+        >
+            <div class="tutorial-box">
+                <header class="tutorial-head">
+                    <div>
+                        <p class="tutorial-kicker">How it works</p>
+                        <h2 id="tutorialTitle">Journal Entry Formatter</h2>
+                    </div>
+
+                    <span
+                        class="tutorial-step-count"
+                        id="tutorialStepCount"
+                        aria-live="polite"
+                    >
+                        Step 1 of 3
+                    </span>
+
+                    <button
+                        type="button"
+                        id="tutorialClose"
+                        class="tutorial-close"
+                        aria-label="Close"
+                    >
+                        ×
+                    </button>
+                </header>
+
+                <div class="tutorial-body" id="tutorialBody">
+                    <section class="tutorial-step" data-step="0">
+                        <h3>What this tool does</h3>
+
+                        <p>
+                            ServiceNow shows Work notes and Additional Comments
+                            as plain text, but renders HTML in those fields when
+                            it sits inside <code>[code][/code]</code>. This page
+                            writes that markup for you and copies it to the
+                            clipboard.
+                        </p>
+
+                        <figure class="tutorial-figure">
+                            <img
+                                class="tutorial-shot-dark"
+                                src="assets/tutorial/editor-dark.png"
+                                width="813"
+                                height="440"
+                                alt="The editor card with a formatted entry and the formatting toolbar above it."
+                            />
+                            <img
+                                class="tutorial-shot-light"
+                                src="assets/tutorial/editor-light.png"
+                                width="813"
+                                height="440"
+                                alt="The editor card with a formatted entry and the formatting toolbar above it."
+                            />
+                            <figcaption>
+                                Everything happens in the browser.
+                            </figcaption>
+                        </figure>
+                    </section>
+
+                    <section class="tutorial-step" data-step="1" hidden>
+                        <h3>What lands on the clipboard</h3>
+
+                        <p>
+                            Copy [formatted] (Ctrl+Alt+C) puts plain text on
+                            the clipboard, with each formatted block inside a
+                            visible <code>[code]</code> tag pair:
+                        </p>
+
+                        <pre class="tutorial-copied">[code]&lt;h2&gt;Deploy complete&lt;/h2&gt;[/code]
+Version [code]&lt;b&gt;2.4.1&lt;/b&gt;[/code] is live in production.
+[code]&lt;ul&gt;&lt;li&gt;Cache cleared&lt;/li&gt;&lt;li&gt;Smoke tests passed&lt;/li&gt;&lt;/ul&gt;[/code]</pre>
+
+                        <p>
+                            ServiceNow renders those blocks as HTML. Preview
+                            shows the same entry the way the journal field will
+                            show it. Paste into Work notes or Additional
+                            comments and post.
+                        </p>
+
+                        <figure class="tutorial-figure">
+                            <img
+                                src="assets/tutorial/preview.png"
+                                width="800"
+                                height="190"
+                                alt="The Preview dialog showing the deploy entry as a ServiceNow journal post."
+                            />
+                            <figcaption>
+                                Preview uses the journal field's own type and
+                                spacing, not the page's theme.
+                            </figcaption>
+                        </figure>
+                    </section>
+
+                    <section class="tutorial-step" data-step="2" hidden>
+                        <h3>Markdown works as you type</h3>
+
+                        <p>
+                            Start a line with a marker and it becomes that
+                            block: <code>#</code> headings, <code>-</code> or
+                            <code>*</code> bullets, <code>1.</code> numbered
+                            lists, <code>&gt;</code> quotes.
+                        </p>
+
+                        <p>
+                            Pasted Markdown converts the same way, and Word or
+                            OneNote formatting comes with it. Images are left
+                            out.
+                        </p>
+                    </section>
+                </div>
+
+                <footer class="tutorial-foot">
+                    <label class="settings-check">
+                        <input type="checkbox" id="tutorialHideInput" />
+                        Don't show this again
+                    </label>
+
+                    <div class="dialog-actions tutorial-actions">
+                        <button type="button" id="tutorialBack" hidden>
+                            Back
+                        </button>
+                        <button
+                            type="button"
+                            id="tutorialNext"
+                            class="primary"
+                            autofocus
+                        >
+                            Next
+                        </button>
+                    </div>
+                </footer>
             </div>
         </dialog>
 
@@ -729,6 +982,7 @@
         <script src="js/preview.js"></script>
         <script src="js/saved.js"></script>
         <script src="js/save-entry.js"></script>
+        <script src="js/tutorial.js"></script>
         <script src="js/io.js"></script>
     </body>
 </html>

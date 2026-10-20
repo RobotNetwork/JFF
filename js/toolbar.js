@@ -2,9 +2,14 @@
    Split out of app.js, lines 281-648. Load order matters: keep the
    <script> tag for this file where index.html puts it. */
 
-/* ---------- Toolbar ---------- */
+/* ---------- Command bars ---------- */
 
-toolbar.addEventListener("mousedown", (event) => {
+/*
+ * The formatting toolbar and the action row under the field both hold
+ * command buttons, so both share this delegation. The heading dropdown only
+ * exists in the toolbar, and the saved menu keeps its own listener.
+ */
+function commandPress(event) {
     /*
      * A press on a control can clear a caret the browser has nowhere to paint
      * before this handler runs. When the editor still holds focus, the caret
@@ -41,7 +46,7 @@ toolbar.addEventListener("mousedown", (event) => {
 
     /* A menu choice has been made, so the menu closes with it. */
     if (button.closest(".dropdown-menu")) closeHeadingMenu();
-});
+}
 
 /*
  * Enter or Space on a focused toolbar button raises a click with detail 0
@@ -49,7 +54,7 @@ toolbar.addEventListener("mousedown", (event) => {
  * real mouse click also raises click, with a non-zero detail, and is already
  * handled above.
  */
-toolbar.addEventListener("click", (event) => {
+function commandActivate(event) {
     if (event.target.closest("#headingToggle")) {
         if (event.detail !== 0) return;
 
@@ -73,7 +78,12 @@ toolbar.addEventListener("click", (event) => {
     runToolbarCommand(button);
 
     if (button.closest(".dropdown-menu")) closeHeadingMenu();
-});
+}
+
+for (const bar of [toolbar, editorActions]) {
+    bar.addEventListener("mousedown", commandPress);
+    bar.addEventListener("click", commandActivate);
+}
 
 function runToolbarCommand(button) {
     flushSnapshot();

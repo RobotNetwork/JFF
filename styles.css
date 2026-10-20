@@ -58,8 +58,8 @@
 
 /*
  * The chrome is not text to read or copy: the page header and its subtext,
- * the formatting toolbar and the menus it opens, and the dialog headings and
- * buttons. Without this, a drag that starts on a label
+ * the formatting toolbar, the action row under the field and the menus they
+ * open, and the dialog headings and buttons. Without this, a drag that starts on a label
  * paints a selection highlight over the control being pressed, which reads as
  * a stuck state. The editor keeps the default, since selecting it is how the
  * entry leaves the app.
@@ -68,8 +68,10 @@
  */
 header,
 .toolbar,
+.editor-actions,
 .dropdown-menu,
 .dialog-actions,
+.tutorial-head,
 .link-form h2,
 .name-form h2 {
     -webkit-user-select: none;
@@ -179,8 +181,8 @@ main {
     align-self: center;
     width: 100%;
     /* 840px minus the 20px side gutters leaves an 800px card. That width fits
-       the toolbar's Preview and Copy buttons on one row, and is the width the
-       preview dialog opens at. */
+       the formatting toolbar on one row, and is the width the preview dialog
+       opens at. */
     max-width: 840px;
     min-height: 0;
     padding: 20px;
@@ -211,10 +213,10 @@ main {
  * is what makes it read as a card now that a divider no longer separates it
  * from anything.
  *
- * Nothing here clips. The toolbar's menus open over the editor, and where the
- * toolbar wraps, the right-aligned copy menu reaches past the card's own edge;
- * clipping the card to round its corners would cut that menu off instead. The
- * toolbar rounds its own top corners to sit inside the border.
+ * Nothing here clips. The toolbar's menus open over the editor, and the saved
+ * menu opens upward from the row beneath the card; clipping the card to round
+ * its corners would cut either one off. The toolbar rounds its top corners to
+ * sit inside the border.
  */
 #editorPane {
     position: relative;
@@ -557,34 +559,53 @@ main {
 }
 
 /*
- * Copy is the one accent-filled toolbar button: it is the action the tool
- * exists to produce, so it reads as the primary control in the row. It is
- * scoped through .toolbar so it outranks the toolbar button rules, which
- * would otherwise give it their own border and background. Its one
- * preference, clear after copy, lives in Settings.
+ * The row beneath the field closes the write-copy loop: Copy, Preview and
+ * Saved sit together rather than at opposite ends of the formatting bar.
+ * It is not part of the card: the controls sit under the bordered entry,
+ * centered on the column, so nothing draws a second field around them.
  */
-.toolbar .copy-button {
-    border: none;
-    background: var(--accent);
-    color: var(--accent-ink);
-    font-weight: 600;
+.editor-actions {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 10px;
 }
 
-.toolbar .copy-button:hover {
-    /* The generic .toolbar button:hover recolours text to the accent, which
-       sits invisibly on the copy button's own accent fill. Re-assert the
-       derived ink so the label stays readable for any chosen accent. */
-    color: var(--accent-ink);
-    filter: brightness(0.92);
-}
-
-.toolbar .copy-button:disabled,
-.toolbar .copy-button:disabled:hover {
+/*
+ * One button treatment for the row, matching Preview's: inherited family,
+ * the formatting bar's 13px size and its unhurried weight. Copy is no
+ * longer filled, so the three controls differ only by their labels.
+ */
+.editor-actions button {
+    min-height: 28px;
+    padding: 4px 9px;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
     background: transparent;
-    box-shadow: inset 0 0 0 1px var(--border);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    transition:
+        border-color 120ms ease,
+        color 120ms ease,
+        background-color 120ms ease;
+}
+
+.editor-actions button:hover {
+    border-color: var(--accent);
+    color: var(--accent-text);
+}
+
+/* Copy is out while the entry is empty; it keeps the row's metrics. */
+.editor-actions button:disabled,
+.editor-actions button:disabled:hover {
+    border-color: var(--border);
     color: var(--muted);
     cursor: default;
-    filter: none;
 }
 
 /*
@@ -777,15 +798,25 @@ main {
 /* ---------- Saved messages ---------- */
 
 /*
- * Wider than the toggle it hangs from, and right-aligned: the toggle sits at
- * the right edge of the header, so a left-aligned panel would leave the
- * window. The width is capped against the window as well, so a narrow one
- * still fits.
+ * The menu opens upward: the action row is the last thing on the card, so
+ * there is nothing below it to open into. The dropdown is left unpositioned
+ * inside the row, which makes the row the menu's containing block; centering
+ * on the whole row rather than on the Saved button keeps the panel on screen
+ * at any width.
  */
-.saved-menu {
-    left: auto;
-    right: 0;
+.editor-actions .dropdown {
+    position: static;
+}
+
+.editor-actions .saved-menu {
+    top: auto;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
     width: min(22rem, calc(100vw - 32px));
+    /* The base menu stretches to the row; this one sizes to the entries. */
+    min-width: 0;
     gap: 6px;
 }
 
@@ -818,7 +849,7 @@ main {
 }
 
 /*
- * The rows are buttons inside the header's actions, so they inherit its
+ * The rows are buttons inside the action row, so they would inherit its
  * outlined treatment; a row is a list line rather than a control on a bar, so
  * the border goes and the highlight comes instead.
  */
@@ -919,7 +950,8 @@ main {
  */
 .link-dialog,
 .name-dialog,
-.settings-dialog {
+.settings-dialog,
+.tutorial-dialog {
     padding: 0;
     border: none;
     background: transparent;
@@ -927,7 +959,8 @@ main {
 
 .link-dialog::backdrop,
 .name-dialog::backdrop,
-.settings-dialog::backdrop {
+.settings-dialog::backdrop,
+.tutorial-dialog::backdrop {
     background: rgb(0 0 0 / 55%);
 }
 
@@ -1244,4 +1277,248 @@ main {
 .settings-actions button:hover {
     border-color: var(--accent);
     color: var(--accent-text);
+}
+
+/* A sentence of context under a settings heading, not a control. */
+.settings-note {
+    max-width: 28rem;
+    margin: 10px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+/*
+ * The admin properties that decide whether pasted markup renders. They are
+ * reference material, not a step, so they stay collapsed until asked for.
+ */
+.settings-details {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.settings-details summary {
+    color: var(--muted);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.settings-details[open] summary {
+    margin-bottom: 8px;
+}
+
+.settings-details p {
+    margin: 0 0 8px;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.settings-props {
+    margin: 0 0 8px;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.settings-props dt {
+    margin-top: 8px;
+}
+
+.settings-props dd {
+    margin: 2px 0 0;
+    color: var(--muted);
+}
+
+.settings-props code {
+    overflow-wrap: anywhere;
+}
+
+/* ---------- Tutorial ---------- */
+
+/*
+ * Wider than Settings because a step carries a screenshot beside its prose,
+ * and capped against the viewport so the footer never falls off a short
+ * window. The body is the only part that scrolls.
+ */
+.tutorial-box {
+    display: flex;
+    flex-direction: column;
+    width: min(46rem, calc(100vw - 32px));
+    max-height: min(88dvh, 820px);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    background: var(--panel);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 50%);
+    overflow: hidden;
+}
+
+.tutorial-head {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px 18px 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.tutorial-head h2 {
+    margin: 0;
+    font-size: 16px;
+}
+
+.tutorial-kicker {
+    margin: 0 0 3px;
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.tutorial-step-count {
+    margin-left: auto;
+    padding-top: 2px;
+    color: var(--muted);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.tutorial-close {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.tutorial-close:hover {
+    border-color: var(--border-strong);
+    color: var(--text);
+}
+
+.tutorial-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 18px;
+}
+
+.tutorial-step {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* The rule above outranks the user agent's display:none for [hidden]. */
+.tutorial-step[hidden] {
+    display: none;
+}
+
+.tutorial-step h3 {
+    margin: 0;
+    font-size: 17px;
+}
+
+.tutorial-step p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+.tutorial-step code {
+    padding: 1px 4px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--code-bg);
+    font-family: var(--mono);
+    font-size: 12px;
+}
+
+/*
+ * The clipboard text, shown as the user will see it: monospace, with the
+ * [code] delimiters in the same size as the markup they wrap. It wraps rather
+ * than scrolling sideways, because a wrapped line still reads as text.
+ */
+.tutorial-copied {
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--code-bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.tutorial-figure {
+    margin: 0;
+}
+
+.tutorial-figure img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+/*
+ * The two captures are the same UI in each palette; only one is shown. The
+ * img in each selector outranks the display:block the figure gives every
+ * image.
+ */
+.tutorial-figure img.tutorial-shot-light {
+    display: none;
+}
+
+:root[data-theme="light"] .tutorial-figure img.tutorial-shot-dark {
+    display: none;
+}
+
+:root[data-theme="light"] .tutorial-figure img.tutorial-shot-light {
+    display: block;
+}
+
+.tutorial-figure figcaption {
+    margin-top: 6px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.tutorial-foot {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 18px;
+    border-top: 1px solid var(--border);
+}
+
+.tutorial-foot .settings-check {
+    margin-top: 0;
+}
+
+.tutorial-actions {
+    margin: 0 0 0 auto;
+}
+
+@media (max-width: 640px) {
+    .tutorial-foot {
+        flex-wrap: wrap;
+    }
+
+    .tutorial-actions {
+        width: 100%;
+    }
 }

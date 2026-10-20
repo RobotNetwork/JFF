@@ -8,8 +8,9 @@ const mirrorBody = document.getElementById("mirrorBody");
 const journalTime = document.getElementById("journalTime");
 const previewDialog = document.getElementById("previewDialog");
 const previewBtn = document.getElementById("previewBtn");
-const toolbarCopyBtn = document.getElementById("toolbarCopyBtn");
+const copyBtn = document.getElementById("copyBtn");
 const toolbar = document.getElementById("toolbar");
+const editorActions = document.getElementById("editorActions");
 const notice = document.getElementById("notice");
 const saveState = document.getElementById("saveState");
 const headingToggle = document.getElementById("headingToggle");
@@ -42,13 +43,23 @@ const settingsDialog = document.getElementById("settingsDialog");
 const settingsNav = document.getElementById("settingsNav");
 const settingsClose = document.getElementById("settingsClose");
 const accentInput = document.getElementById("accentInput");
+const accentResetBtn = document.getElementById("accentResetBtn");
 const clearAfterCopyInput = document.getElementById("clearAfterCopyInput");
+const tutorialDialog = document.getElementById("tutorialDialog");
+const tutorialBody = document.getElementById("tutorialBody");
+const tutorialStepCount = document.getElementById("tutorialStepCount");
+const tutorialClose = document.getElementById("tutorialClose");
+const tutorialBack = document.getElementById("tutorialBack");
+const tutorialNext = document.getElementById("tutorialNext");
+const tutorialHideInput = document.getElementById("tutorialHideInput");
+const tutorialStartInput = document.getElementById("tutorialStartInput");
+const tutorialOpenBtn = document.getElementById("tutorialOpenBtn");
 
 /*
- * The toolbar's Copy button is the one copy control. render() disables it
- * while the entry holds nothing to copy.
+ * Copy is the one control that takes this path. render() disables it while
+ * the entry holds nothing to copy.
  */
-const copyButtons = [toolbarCopyBtn];
+const copyButtons = [copyBtn];
 
 /*
  * Whether the preview is on screen. It is the one thing that decides whether
