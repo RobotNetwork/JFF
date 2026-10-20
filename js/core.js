@@ -47,7 +47,6 @@ const accentResetBtn = document.getElementById("accentResetBtn");
 const clearAfterCopyInput = document.getElementById("clearAfterCopyInput");
 const tutorialDialog = document.getElementById("tutorialDialog");
 const tutorialBody = document.getElementById("tutorialBody");
-const tutorialStepCount = document.getElementById("tutorialStepCount");
 const tutorialClose = document.getElementById("tutorialClose");
 const tutorialBack = document.getElementById("tutorialBack");
 const tutorialNext = document.getElementById("tutorialNext");

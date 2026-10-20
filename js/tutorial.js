@@ -59,8 +59,6 @@ function showTutorialStep(index) {
         step.hidden = stepIndex !== tutorialIndex;
     });
 
-    tutorialStepCount.textContent =
-        `Step ${tutorialIndex + 1} of ${tutorialSteps.length}`;
     tutorialBack.hidden = tutorialIndex === 0;
     tutorialNext.textContent =
         tutorialIndex === tutorialSteps.length - 1 ? "Done" : "Next";

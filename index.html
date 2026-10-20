@@ -723,8 +723,8 @@
                             <h3>How it works</h3>
 
                             <p class="settings-note">
-                                Three screens: what the page does, what lands
-                                on the clipboard, and the Markdown it reads.
+                                Two screens: what the page does, and what
+                                lands on the clipboard.
                             </p>
 
                             <div class="settings-actions">
@@ -823,22 +823,11 @@
         <dialog
             id="tutorialDialog"
             class="tutorial-dialog"
-            aria-labelledby="tutorialTitle"
+            aria-label="How it works"
         >
             <div class="tutorial-box">
                 <header class="tutorial-head">
-                    <div>
-                        <p class="tutorial-kicker">How it works</p>
-                        <h2 id="tutorialTitle">Journal Entry Formatter</h2>
-                    </div>
-
-                    <span
-                        class="tutorial-step-count"
-                        id="tutorialStepCount"
-                        aria-live="polite"
-                    >
-                        Step 1 of 3
-                    </span>
+                    <p class="tutorial-kicker">How it works</p>
 
                     <button
                         type="button"
@@ -878,7 +867,9 @@
                                 alt="The editor card with a formatted entry and the formatting toolbar above it."
                             />
                             <figcaption>
-                                Everything happens in the browser.
+                                Supports Markdown typing and pasting, and
+                                accepts and reformats text from Word or
+                                OneNote.
                             </figcaption>
                         </figure>
                     </section>
@@ -915,23 +906,6 @@ Version [code]&lt;b&gt;2.4.1&lt;/b&gt;[/code] is live in production.
                                 spacing, not the page's theme.
                             </figcaption>
                         </figure>
-                    </section>
-
-                    <section class="tutorial-step" data-step="2" hidden>
-                        <h3>Markdown works as you type</h3>
-
-                        <p>
-                            Start a line with a marker and it becomes that
-                            block: <code>#</code> headings, <code>-</code> or
-                            <code>*</code> bullets, <code>1.</code> numbered
-                            lists, <code>&gt;</code> quotes.
-                        </p>
-
-                        <p>
-                            Pasted Markdown converts the same way, and Word or
-                            OneNote formatting comes with it. Images are left
-                            out.
-                        </p>
                     </section>
                 </div>
 
