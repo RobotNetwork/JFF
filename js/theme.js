@@ -4,7 +4,6 @@
    missing or unreadable store, or a value this file does not know, starts
    dark rather than following the system preference. */
 
-const themeKey = "jff.theme.v1";
 const themeRoot = document.documentElement;
 
 /*
@@ -13,7 +12,7 @@ const themeRoot = document.documentElement;
  */
 function readStoredTheme() {
     try {
-        return window.localStorage.getItem(themeKey);
+        return window.localStorage.getItem(storageKeys.theme);
     } catch {
         return null;
     }
@@ -21,7 +20,7 @@ function readStoredTheme() {
 
 function persistTheme(theme) {
     try {
-        window.localStorage.setItem(themeKey, theme);
+        window.localStorage.setItem(storageKeys.theme, theme);
     } catch {
         /* The theme still applies; only the choice is lost at the reload. */
     }

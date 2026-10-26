@@ -5,8 +5,6 @@
 
 /* ---------- Tutorial ---------- */
 
-const tutorialHiddenKey = "jff.tutorialHidden.v1";
-
 const tutorialSteps = [
     ...tutorialDialog.querySelectorAll(".tutorial-step"),
 ];
@@ -15,7 +13,7 @@ let tutorialIndex = 0;
 
 /* The one stored preference: true means the walkthrough stays closed. */
 function tutorialIsHidden() {
-    return readStoredEntry(tutorialHiddenKey) === "true";
+    return readStoredEntry(storageKeys.tutorialHidden) === "true";
 }
 
 /*
@@ -27,9 +25,9 @@ function tutorialIsHidden() {
 function setTutorialHidden(hidden) {
     try {
         if (hidden) {
-            window.localStorage.setItem(tutorialHiddenKey, "true");
+            window.localStorage.setItem(storageKeys.tutorialHidden, "true");
         } else {
-            window.localStorage.removeItem(tutorialHiddenKey);
+            window.localStorage.removeItem(storageKeys.tutorialHidden);
         }
     } catch {
         /* The walkthrough still works; only the choice is lost at reload. */

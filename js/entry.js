@@ -10,7 +10,6 @@
  * through the same sanitiser on the way out: whatever is in storage is held to
  * the rules a paste is held to, whether or not it came from one.
  */
-const storageKey = "jff.entry.v1";
 const saveDelay = 400;
 
 let saveTimer = null;
@@ -41,7 +40,7 @@ function saveEntry() {
     }
 
     try {
-        window.localStorage.setItem(storageKey, editor.innerHTML);
+        window.localStorage.setItem(storageKeys.draft, editor.innerHTML);
         setSaveState(false);
     } catch {
         /*
@@ -68,7 +67,7 @@ function flushSave() {
 }
 
 function restoreEntry() {
-    const stored = readStoredEntry(storageKey);
+    const stored = readStoredEntry(storageKeys.draft);
 
     if (!stored) return false;
 

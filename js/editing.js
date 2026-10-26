@@ -436,16 +436,38 @@ function textBefore(element, range) {
 
 /*
  * The end of the item's own text, which is its content without the nested
- * lists that hang off it.
+ * lists that hang off it. Its children are included, so an item whose text
+ * sits in a <b> is read too. A caret placed after the item's children would
+ * sit inside the last nested item, and that is where typed text would land.
  */
 function caretToItem(item) {
-    const texts = [...item.childNodes].filter(
-        (node) => node.nodeType === Node.TEXT_NODE,
-    );
-    const target = texts.length ? texts[texts.length - 1] : item;
+    const texts = [];
+    const collect = (node) => {
+        for (const child of node.childNodes) {
+            if (child.nodeType === Node.TEXT_NODE) {
+                texts.push(child);
+            } else if (child.nodeName !== "UL" && child.nodeName !== "OL") {
+                collect(child);
+            }
+        }
+    };
+
+    collect(item);
+
     const range = document.createRange();
 
-    range.setStart(target, nodeOffset(target));
+    if (texts.length > 0) {
+        const target = texts[texts.length - 1];
+
+        range.setStart(target, nodeOffset(target));
+    } else {
+        const list = [...item.children].findIndex(
+            (child) => child.nodeName === "UL" || child.nodeName === "OL",
+        );
+
+        range.setStart(item, list === -1 ? item.childNodes.length : list);
+    }
+
     range.collapse(true);
 
     const selection = window.getSelection();
@@ -456,17 +478,42 @@ function caretToItem(item) {
 
 /*
  * Moving a list item with appendChild drops the selection to the editable in
- * Chrome, so the range is captured and re-applied around the move. The range
- * holds node references rather than a path, and the nodes travel with the
- * item, so it lands back on the same character.
+ * Chrome, and insertBefore is a remove and an insert, so a range that sat
+ * inside the moved item is clamped to where the item left from. The nodes
+ * themselves travel with the item, so the caret is kept as a node and an
+ * offset and built again once the move is done, which lands it back on the
+ * same character.
  */
 function preservingSelection(item, move) {
     const selection = window.getSelection();
-    const range =
-        selection.rangeCount > 0 ? selection.getRangeAt(0).cloneRange() : null;
+    const saved =
+        selection.rangeCount > 0
+            ? {
+                  start: selection.getRangeAt(0).startContainer,
+                  startOffset: selection.getRangeAt(0).startOffset,
+                  end: selection.getRangeAt(0).endContainer,
+                  endOffset: selection.getRangeAt(0).endOffset,
+              }
+            : null;
     const result = move();
 
-    if (range && editor.contains(range.startContainer)) {
+    if (saved && editor.contains(saved.start)) {
+        const range = document.createRange();
+
+        range.setStart(
+            saved.start,
+            Math.min(saved.startOffset, nodeOffset(saved.start)),
+        );
+
+        if (editor.contains(saved.end)) {
+            range.setEnd(
+                saved.end,
+                Math.min(saved.endOffset, nodeOffset(saved.end)),
+            );
+        } else {
+            range.collapse(true);
+        }
+
         selection.removeAllRanges();
         selection.addRange(range);
     }
@@ -530,7 +577,29 @@ function outdentListItem(item) {
 
         if (!parentList) return false;
 
+        /*
+         * The item lands after everything the parent item holds, so the
+         * siblings that came after it would end up reading below it. They
+         * keep their place by becoming its children, which is the level they
+         * already sit at.
+         */
+        const siblings = [...sublist.children];
+        const following = siblings.slice(siblings.indexOf(item) + 1);
+
+        const tag = sublist.tagName.toLowerCase();
+
         parentList.insertBefore(item, parentItem.nextElementSibling);
+
+        if (following.length > 0) {
+            let itemList = item.lastElementChild;
+
+            if (!itemList || itemList.tagName.toLowerCase() !== tag) {
+                itemList = document.createElement(tag);
+                item.appendChild(itemList);
+            }
+
+            for (const sibling of following) itemList.appendChild(sibling);
+        }
 
         /*
          * An empty list left behind renders as a stray bullet once its item
@@ -555,10 +624,21 @@ function listItemsInSelection() {
         return item ? [item] : [];
     }
 
-    return [...editor.querySelectorAll("ul, ol")].flatMap((list) =>
+    const items = [...editor.querySelectorAll("ul, ol")].flatMap((list) =>
         [...list.querySelectorAll(":scope > li")].filter((item) =>
             range.intersectsNode(item),
         ),
+    );
+
+    /*
+     * An item that holds another selected item only matched because the
+     * range starts or ends inside it. Moving it would take those children
+     * with it, and the range rebuilt over the moves would cover its text,
+     * so the next keystroke would replace text the selection never had.
+     */
+    return items.filter(
+        (item) =>
+            !items.some((other) => other !== item && item.contains(other)),
     );
 }
 

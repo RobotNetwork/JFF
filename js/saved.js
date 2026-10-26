@@ -11,7 +11,6 @@
  * is a plain JSON array, which makes an export something a person can read and
  * an import the same file back.
  */
-const savedKey = "jff.saved.v1";
 const savedNameLimit = 120;
 const savedPreviewLimit = 90;
 
@@ -46,7 +45,7 @@ function savedRecord(value) {
 }
 
 function readSaved() {
-    const raw = readStoredEntry(savedKey);
+    const raw = readStoredEntry(storageKeys.savedMessages);
 
     if (!raw) return [];
 
@@ -72,7 +71,10 @@ function writeSaved(records) {
     }
 
     try {
-        window.localStorage.setItem(savedKey, JSON.stringify(records));
+        window.localStorage.setItem(
+            storageKeys.savedMessages,
+            JSON.stringify(records),
+        );
 
         return true;
     } catch {

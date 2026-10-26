@@ -54,7 +54,6 @@ closeOnBackdrop(settingsDialog, () => settingsDialog.close());
 /* ---------- Accent colour ---------- */
 
 const defaultAccent = "#1a7f37";
-const accentKey = "jff.accent.v1";
 
 /* The wheel and the store both speak a six-digit hex colour, nothing else. */
 function validAccent(value) {
@@ -95,14 +94,14 @@ function persistAccent(hex) {
     if (!storageAvailable()) return;
 
     try {
-        window.localStorage.setItem(accentKey, hex);
+        window.localStorage.setItem(storageKeys.accent, hex);
     } catch {
         /* A full store is not worth interrupting the picker over. */
     }
 }
 
 function restoreAccent() {
-    const stored = readStoredEntry(accentKey);
+    const stored = readStoredEntry(storageKeys.accent);
 
     applyAccent(validAccent(stored) ? stored : defaultAccent);
 }
@@ -118,7 +117,7 @@ function resetAccent() {
     if (!storageAvailable()) return;
 
     try {
-        window.localStorage.removeItem(accentKey);
+        window.localStorage.removeItem(storageKeys.accent);
     } catch {
         /* The default applies now; the stored choice only returns on reload. */
     }
@@ -133,8 +132,6 @@ accentResetBtn.addEventListener("click", resetAccent);
 
 /* ---------- Clear after copy ---------- */
 
-const clearAfterCopyKey = "jff.clearAfterCopy.v1";
-
 let clearAfterCopyEnabled = false;
 
 function setClearAfterCopy(enabled) {
@@ -146,14 +143,17 @@ function persistClearAfterCopy(enabled) {
     if (!storageAvailable()) return;
 
     try {
-        window.localStorage.setItem(clearAfterCopyKey, String(enabled));
+        window.localStorage.setItem(
+            storageKeys.clearAfterCopy,
+            String(enabled),
+        );
     } catch {
         /* A full store is not worth interrupting the preference over. */
     }
 }
 
 function restoreClearAfterCopy() {
-    setClearAfterCopy(readStoredEntry(clearAfterCopyKey) === "true");
+    setClearAfterCopy(readStoredEntry(storageKeys.clearAfterCopy) === "true");
 }
 
 clearAfterCopyInput.addEventListener("change", () => {

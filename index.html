@@ -24,11 +24,13 @@
         />
 
         <!--
-            Reads the saved theme and puts it on the root before the
-            stylesheet paints. Loading it at the end of the body would let the
-            default dark palette show for a frame before a saved light theme
-            replaced it.
+            The storage keys are moved to their plain names first, since
+            theme.js reads one of them. It reads the saved theme and puts it
+            on the root before the stylesheet paints. Loading it at the end of
+            the body would let the default dark palette show for a frame
+            before a saved light theme replaced it.
         -->
+        <script src="js/storage.js"></script>
         <script src="js/theme.js"></script>
         <link rel="stylesheet" href="styles.css" />
     </head>
