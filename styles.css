@@ -26,30 +26,34 @@
 
 /*
  * Dark is the default whatever the system asks for; the toggle in the header
- * reads the saved choice and writes data-theme on the root. The light palette
- * is the same set of roles, so nothing below this block names a colour that
- * has to change with the theme.
+ * reads the saved choice and writes data-theme on the root. Only the editor
+ * card takes the light palette. The page chrome around it (the header, the
+ * action row, the dialogs and the notice) keeps the dark one, so the field is
+ * the single surface whose colour changes and the theme switch still reports
+ * the choice it made.
+ *
+ * The light palette is the same set of roles as the dark one, so nothing
+ * below this block names a colour that has to change with the theme. The
+ * accent roles are not repeated here: they inherit from the root, where
+ * Settings writes a custom accent inline, and redeclaring them would shadow
+ * that choice inside the card.
  */
-:root[data-theme="light"] {
+:root[data-theme="light"] #editorPane {
     color-scheme: light;
     --bg: #f6f7f9;
     --panel: #ffffff;
     --border: #dcdfe4;
     --border-strong: #9aa1ab;
     --text: #1c1f24;
-    --accent: #1a7f37;
-    --accent-ink: #ffffff;
+    /* Resolved here so the mix uses this palette's text, not the root's. */
+    --accent-text: color-mix(in srgb, var(--accent) 55%, var(--text));
     --code-bg: #f0f2f5;
     --danger: #b3261e;
     --muted: #5b636d;
 }
 
-:root[data-theme="light"] .dropdown-menu {
+:root[data-theme="light"] #editorPane .dropdown-menu {
     box-shadow: 0 6px 16px rgb(0 0 0 / 18%);
-}
-
-:root[data-theme="light"] .notice {
-    box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
 }
 
 * {
@@ -213,6 +217,10 @@ main {
  * is what makes it read as a card now that a divider no longer separates it
  * from anything.
  *
+ * The card carries its own fill because the light palette is scoped to it:
+ * the body behind it stays dark, so without this the field's light text would
+ * sit on the page colour. In the dark theme this is the body colour again.
+ *
  * Nothing here clips. The toolbar's menus open over the editor, and the saved
  * menu opens upward from the row beneath the card; clipping the card to round
  * its corners would cut either one off. The toolbar rounds its top corners to
@@ -223,6 +231,12 @@ main {
     flex: 1 1 auto;
     border: 1px solid var(--border);
     border-radius: 8px;
+    background: var(--bg);
+    /*
+     * Body resolves its colour against the dark palette and everything would
+     * otherwise inherit that resolved value, not the card's own --text.
+     */
+    color: var(--text);
 }
 
 /*
@@ -1164,15 +1178,42 @@ main {
     justify-content: center;
 }
 
+/* A labelled row for a control that is not a text or colour field. */
+.settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 10px;
+    font-size: 13px;
+}
+
 /*
- * The theme switch shows one icon: the sun while the page is dark (press for
- * light), the moon while it is light. Both are in the markup so the swap is a
- * display rule rather than DOM the script has to rebuild.
+ * The theme switch shows one icon: the sun while the editor is dark (press
+ * for light), the moon while it is light. Both are in the markup so the swap
+ * is a display rule rather than DOM the script has to rebuild. It carries the
+ * settings controls' button treatment because it no longer sits in the
+ * header.
  */
 #themeToggle {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    min-height: 28px;
+    padding: 4px 9px;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transition:
+        border-color 120ms ease,
+        color 120ms ease;
+}
+
+#themeToggle:hover {
+    border-color: var(--accent);
+    color: var(--accent-text);
 }
 
 #themeToggle .theme-icon {

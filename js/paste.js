@@ -74,6 +74,58 @@ function insertRichText(html) {
     return { inserted: true, dropped };
 }
 
+/*
+ * The href a paste should turn a selection into, or an empty string. Only a
+ * clipboard holding nothing but the link counts, so text that happens to
+ * mention a URL still pastes as text. The href rules are the dialog's, since
+ * a link pasted here and one typed into Ctrl K have to end up the same.
+ */
+function pastedLinkHref(dataTransfer) {
+    const text = dataTransfer.getData("text/plain").trim();
+
+    if (text !== "" && !/\s/.test(text)) {
+        const href = normalizeHref(text);
+
+        if (href) return href;
+    }
+
+    const html = dataTransfer.getData("text/html");
+
+    if (!html) return "";
+
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const anchors = doc.body.querySelectorAll("a[href]");
+
+    if (anchors.length !== 1) return "";
+
+    /*
+     * A page copy arrives as the anchor plus its text. Anything else around
+     * it means the clipboard is more than a link, so it takes the ordinary
+     * paste path instead.
+     */
+    if (doc.body.textContent.trim() !== anchors[0].textContent.trim()) {
+        return "";
+    }
+
+    return normalizeHref(anchors[0].getAttribute("href"));
+}
+
+/*
+ * Selection text replaced by a link, which is what Ctrl K over the same
+ * selection would produce. A selection already inside a link has its href
+ * rewritten rather than a second anchor nested inside the first.
+ */
+function linkSelection(href, range) {
+    const existing = linkInRange(range);
+
+    if (existing) {
+        existing.setAttribute("href", href);
+        return true;
+    }
+
+    return document.execCommand("createLink", false, href);
+}
+
 function reportDropped(media, files) {
     const parts = [];
 
@@ -126,6 +178,39 @@ function insertClipboard(dataTransfer) {
 }
 
 editor.addEventListener("paste", (event) => {
+    const selection = window.getSelection();
+    const range = selection.rangeCount ? selection.getRangeAt(0) : null;
+
+    /*
+     * A URL pasted over selected text links it, the way Ctrl K does. Both
+     * ends have to sit in the editor, or the command would rewrite whatever
+     * selection the page happened to hold.
+     */
+    if (
+        range &&
+        !selection.isCollapsed &&
+        editor.contains(range.startContainer) &&
+        editor.contains(range.endContainer)
+    ) {
+        const href = pastedLinkHref(event.clipboardData);
+
+        if (href) {
+            event.preventDefault();
+            flushSnapshot();
+
+            /* A browser that refuses the command leaves the paste alone. */
+            if (!linkSelection(href, range)) {
+                insertClipboard(event.clipboardData);
+                return;
+            }
+
+            queueSnapshot();
+            render();
+            updateToolbarState();
+            return;
+        }
+    }
+
     event.preventDefault();
     flushSnapshot();
 

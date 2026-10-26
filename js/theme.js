@@ -34,9 +34,9 @@ function applyTheme(theme) {
 applyTheme(readStoredTheme() === "light" ? "light" : "dark");
 
 /*
- * The toggle is in the header, which does not exist yet in the head. Its
- * state is the theme itself rather than a separate flag, so a restored light
- * theme opens with the switch already on.
+ * The toggle is in the Settings dialog, which does not exist yet in the head.
+ * Its state is the theme itself rather than a separate flag, so a restored
+ * light theme opens with the switch already on.
  */
 document.addEventListener("DOMContentLoaded", () => {
     const themeToggle = document.getElementById("themeToggle");
