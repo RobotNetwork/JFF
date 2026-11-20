@@ -14,6 +14,18 @@ editor.addEventListener("input", (event) => {
         applyTypedMarker();
     }
 
+    /*
+     * The second backtick of a pair is inserted before this runs, so the run
+     * between the delimiters is already in the DOM.
+     */
+    if (
+        event.inputType === "insertText" &&
+        event.data === "`" &&
+        !event.isComposing
+    ) {
+        applyTypedInlineCode();
+    }
+
     queueSnapshot();
     render();
     updateToolbarState();

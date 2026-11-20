@@ -755,6 +755,65 @@ function applyTypedMarker() {
 }
 
 /*
+ * A closing backtick turns the run between it and the backtick before it
+ * into an inline code span, the way the paste parser reads a code span in
+ * pasted markdown. Both delimiters are removed, since they are markup rather
+ * than content, and the caret gets a character of its own after the span so
+ * the next keystroke lands in prose.
+ *
+ * The run stays text when it is empty or only whitespace, which lets a lone
+ * backtick be typed, and when the caret is already inside code, where a
+ * backtick is part of the code. Only the text node that holds the caret is
+ * searched, so a delimiter split off by formatting is left as typed.
+ */
+function applyTypedInlineCode() {
+    const selection = window.getSelection();
+
+    if (!selection.rangeCount || !selection.isCollapsed) return false;
+
+    const range = selection.getRangeAt(0);
+    const node = range.startContainer;
+
+    if (node.nodeType !== Node.TEXT_NODE) return false;
+
+    const beforeCaret = node.data.slice(0, range.startOffset);
+
+    if (!beforeCaret.endsWith("`")) return false;
+
+    const element = closestElement(node);
+
+    if (element.closest("pre") || inlineCodeElement(node)) return false;
+
+    const open = beforeCaret.lastIndexOf("`", beforeCaret.length - 2);
+    const content = open === -1 ? "" : beforeCaret.slice(open + 1, -1);
+
+    if (!content.trim() || content.includes("\n")) return false;
+
+    flushSnapshot();
+
+    const code = document.createElement("code");
+    const outside = document.createTextNode(
+        `${caretAnchor}${node.data.slice(range.startOffset)}`,
+    );
+    const before =
+        open > 0 ? [document.createTextNode(node.data.slice(0, open))] : [];
+
+    code.textContent = content;
+
+    node.replaceWith(...before, code, outside);
+
+    const caret = document.createRange();
+
+    caret.setStart(outside, caretAnchor.length);
+    caret.collapse(true);
+
+    selection.removeAllRanges();
+    selection.addRange(caret);
+
+    return true;
+}
+
+/*
  * The marker is markup, not content, so it never reaches the block. A bare
  * text node is trimmed in place rather than deleted, since it is about to
  * become the block's content, and the marker is its entire text up to the
