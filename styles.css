@@ -549,6 +549,17 @@ main {
     margin-top: 0;
 }
 
+/*
+ * The editor's own lines are divs, which carry no margin. Paste arrives as
+ * paragraphs, though, and a p keeps the browser's 1em margins, so pasted
+ * lines sit apart from one another and from the divs around them. The
+ * serializer treats p and div alike, so the gap is display-only and is
+ * taken out here.
+ */
+#editor p {
+    margin: 0;
+}
+
 #editor:focus {
     background: rgb(from var(--accent) r g b / 0.02);
     outline: 1px solid var(--accent);

@@ -259,6 +259,25 @@ const commands = {
                 return false;
             }
 
+            /*
+             * A selection that crosses into another block gets one code
+             * block built by hand: the browser command turns a multi-block
+             * selection into a pre per block, or converts only the block
+             * its boundary landed in, whichever way the range happened to
+             * sit. A single block still goes through the command, which
+             * keeps the caret where it was.
+             */
+            const range = selection.rangeCount ? selection.getRangeAt(0) : null;
+            const built =
+                range && !range.collapsed ? buildCodeBlock(range) : null;
+
+            if (built) {
+                normalizeCodeBlocks(editor);
+                placeCaretAtEnd(built);
+
+                return false;
+            }
+
             document.execCommand("formatBlock", false, "pre");
             normalizeCodeBlocks(editor);
 
@@ -376,6 +395,95 @@ function blockOf(node) {
 
 function rangeCrossesBlocks(range) {
     return blockOf(range.startContainer) !== blockOf(range.endContainer);
+}
+
+/*
+ * The deepest line block a selection boundary sits in: the nearest block
+ * element around it, or, for a boundary on the editor itself or on bare
+ * content between its blocks, the editor's child the offset points at.
+ */
+function lineNodeAt(node, offset, atEnd) {
+    if (!editor.contains(node)) return null;
+
+    if (node === editor) {
+        const index = atEnd ? offset - 1 : offset;
+
+        return editor.childNodes[index] ?? null;
+    }
+
+    const block = closestElement(node)?.closest(blockSelector);
+
+    if (block) return block;
+
+    let current = node;
+
+    while (current.parentNode !== editor) current = current.parentNode;
+
+    return current;
+}
+
+/*
+ * The nearest container the two line blocks share, then the run of its
+ * children the selection crosses.
+ */
+function buildCodeBlock(range) {
+    let startLine = lineNodeAt(range.startContainer, range.startOffset, false);
+    let endLine = lineNodeAt(range.endContainer, range.endOffset, true);
+
+    if (!startLine || !endLine) return null;
+
+    const ancestors = new Set();
+
+    for (let n = startLine.parentNode; n && editor.contains(n); n = n.parentNode) {
+        ancestors.add(n);
+    }
+
+    let parent = editor;
+
+    for (let n = endLine.parentNode; n && editor.contains(n); n = n.parentNode) {
+        if (ancestors.has(n)) {
+            parent = n;
+            break;
+        }
+    }
+
+    while (startLine.parentNode !== parent) startLine = startLine.parentNode;
+    while (endLine.parentNode !== parent) endLine = endLine.parentNode;
+
+    /* One block: the browser command handles it and keeps the caret. */
+    if (startLine === endLine) return null;
+
+    const children = [...parent.childNodes];
+    const start = children.indexOf(startLine);
+    const end = children.indexOf(endLine);
+    const touched = children.slice(
+        Math.min(start, end),
+        Math.max(start, end) + 1,
+    );
+
+    /*
+     * codeText reads a block's lines, whatever the line structure arrived
+     * as: real blocks, a <br> run, or the newlines a code block already
+     * holds. A piece's own trailing newline is the break the join below
+     * writes anyway, so one goes; blank lines the run starts or ends with
+     * go with the edges.
+     */
+    const pre = document.createElement("pre");
+
+    pre.textContent = touched
+        .map((node) => {
+            const text =
+                node.nodeType === Node.TEXT_NODE ? node.data : codeText(node);
+
+            return text.replace(/\n$/, "");
+        })
+        .join("\n")
+        .replace(/^\n+|\n+$/g, "");
+
+    touched[0].before(pre);
+    touched.forEach((node) => node.remove());
+
+    return pre;
 }
 
 function wrapInlineCode() {
