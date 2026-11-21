@@ -776,31 +776,42 @@ function applyTypedInlineCode() {
 
     if (node.nodeType !== Node.TEXT_NODE) return false;
 
-    const beforeCaret = node.data.slice(0, range.startOffset);
-
-    if (!beforeCaret.endsWith("`")) return false;
+    if (node.data.charAt(range.startOffset - 1) !== "`") return false;
 
     const element = closestElement(node);
 
     if (element.closest("pre") || inlineCodeElement(node)) return false;
 
-    const open = beforeCaret.lastIndexOf("`", beforeCaret.length - 2);
-    const content = open === -1 ? "" : beforeCaret.slice(open + 1, -1);
+    const run = runBeforeCaret(node, range.startOffset);
 
-    if (!content.trim() || content.includes("\n")) return false;
+    if (!run || !run.content.trim() || run.content.includes("\n")) return false;
 
     flushSnapshot();
 
     const code = document.createElement("code");
-    const outside = document.createTextNode(
-        `${caretAnchor}${node.data.slice(range.startOffset)}`,
-    );
+
+    code.textContent = run.content;
+
+    const first = run.segments[0];
+    const lastSegment = run.segments[run.segments.length - 1];
+    const open = first.start - 1;
     const before =
-        open > 0 ? [document.createTextNode(node.data.slice(0, open))] : [];
+        open > 0
+            ? [document.createTextNode(first.node.data.slice(0, open))]
+            : [];
+    const outside = document.createTextNode(
+        `${caretAnchor}${lastSegment.node.data.slice(range.startOffset)}`,
+    );
 
-    code.textContent = content;
-
-    node.replaceWith(...before, code, outside);
+    if (first.node === lastSegment.node) {
+        node.replaceWith(...before, code, outside);
+    } else {
+        first.node.replaceWith(...before, code);
+        for (let i = 1; i < run.segments.length - 1; i++) {
+            run.segments[i].node.remove();
+        }
+        lastSegment.node.replaceWith(outside);
+    }
 
     const caret = document.createRange();
 
@@ -811,6 +822,54 @@ function applyTypedInlineCode() {
     selection.addRange(caret);
 
     return true;
+}
+
+/*
+ * The text between the delimiters, walked backwards from the closing backtick
+ * and read forwards again. The walk crosses text nodes because a paste splits
+ * the line into separate nodes: insertHtmlAtCursor inserts the clipboard as
+ * its own node, so the closing backtick lands in the pasted text while the
+ * open one stayed behind in the node before it. It stops at the first
+ * non-text sibling, since flattening a run that crosses a <br> or a span from
+ * rich text would take formatting the span cannot carry, and stops without a
+ * delimiter the same way a run with no opener stays text.
+ */
+function runBeforeCaret(node, closeOffset) {
+    const segments = [];
+
+    let current = node;
+    let end = closeOffset - 1;
+
+    while (true) {
+        const open = end > 0 ? current.data.lastIndexOf("`", end - 1) : -1;
+
+        segments.unshift({
+            node: current,
+            start: open === -1 ? 0 : open + 1,
+            end,
+        });
+
+        if (open !== -1) {
+            return {
+                segments,
+                content: segments
+                    .map((segment) =>
+                        segment.node.data.slice(
+                            segment.start,
+                            segment.end,
+                        ),
+                    )
+                    .join(""),
+            };
+        }
+
+        const previous = current.previousSibling;
+
+        if (!previous || previous.nodeType !== Node.TEXT_NODE) return null;
+
+        current = previous;
+        end = previous.data.length;
+    }
 }
 
 /*
