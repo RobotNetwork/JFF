@@ -29,12 +29,14 @@ async function importSaved(file) {
 
         incoming = parsed.map(savedRecord).filter(Boolean);
     } catch {
-        showNotice("That file is not a saved-messages export.");
+        showNotice("That file is not a saved-messages export.", {
+            tone: "error",
+        });
         return;
     }
 
     if (incoming.length === 0) {
-        showNotice("That file holds no saved messages.");
+        showNotice("That file holds no saved messages.", { tone: "error" });
         return;
     }
 

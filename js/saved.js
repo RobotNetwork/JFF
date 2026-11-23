@@ -66,7 +66,9 @@ function readSaved() {
 /* Reports a refusal rather than letting a save disappear quietly. */
 function writeSaved(records) {
     if (!storageAvailable()) {
-        showNotice("This browser refuses to store saved messages.");
+        showNotice("This browser refuses to store saved messages.", {
+            tone: "error",
+        });
         return false;
     }
 
@@ -78,7 +80,9 @@ function writeSaved(records) {
 
         return true;
     } catch {
-        showNotice("Saved messages could not be written: the store is full.");
+        showNotice("Saved messages could not be written: the store is full.", {
+            tone: "error",
+        });
 
         return false;
     }
@@ -249,7 +253,9 @@ function insertSavedMessage(id) {
     const { html } = sanitizeEntryHtml(record.html);
 
     if (html === "") {
-        showNotice(`"${record.name}" holds nothing to insert.`);
+        showNotice(`"${record.name}" holds nothing to insert.`, {
+            tone: "error",
+        });
         return;
     }
 

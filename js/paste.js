@@ -15,12 +15,33 @@ const droppedMediaSelector =
 const noticeDelay = 5000;
 
 let noticeTimer = null;
+let noticeFrame = null;
 
-function showNotice(message) {
+function showNotice(message, { tone = "status" } = {}) {
+    const isError = tone === "error";
+
     clearTimeout(noticeTimer);
+    if (noticeFrame !== null && typeof cancelAnimationFrame === "function") {
+        cancelAnimationFrame(noticeFrame);
+        noticeFrame = null;
+    }
 
-    notice.textContent = message;
+    notice.setAttribute("role", isError ? "alert" : "status");
+    notice.setAttribute("aria-live", isError ? "assertive" : "polite");
+    notice.classList.toggle("is-error", isError);
+    notice.textContent = "";
     notice.classList.add("is-visible");
+
+    const commit = () => {
+        noticeFrame = null;
+        notice.textContent = message;
+    };
+
+    if (typeof requestAnimationFrame === "function") {
+        noticeFrame = requestAnimationFrame(commit);
+    } else {
+        commit();
+    }
 
     noticeTimer = setTimeout(() => {
         noticeTimer = null;

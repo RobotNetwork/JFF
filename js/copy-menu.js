@@ -50,6 +50,27 @@ function copyViaExecCommand(text) {
     return copied;
 }
 
+const copyFeedbackDelay = 1500;
+let copyFeedbackTimer = null;
+
+function flashCopyButton() {
+    if (typeof copyBtn === "undefined" || !copyBtn) return;
+
+    if (!copyBtn.dataset.defaultLabel) {
+        copyBtn.dataset.defaultLabel = copyBtn.textContent.trim();
+    }
+
+    clearTimeout(copyFeedbackTimer);
+    copyBtn.textContent = "Copied";
+    copyBtn.classList.add("is-copied");
+
+    copyFeedbackTimer = setTimeout(() => {
+        copyFeedbackTimer = null;
+        copyBtn.textContent = copyBtn.dataset.defaultLabel;
+        copyBtn.classList.remove("is-copied");
+    }, copyFeedbackDelay);
+}
+
 /*
  * Reached by the button and by the chord, so the copy itself is not the
  * button's handler. Whether the entry is cleared after copying is the
@@ -73,12 +94,23 @@ async function copyOutput() {
 
     if (!copied) copied = copyViaExecCommand(text);
 
-    showNotice(
-        copied
-            ? "Copied to clipboard!"
-            : "Could not copy formatted markup to clipboard.",
-    );
+    if (!copied) {
+        showNotice("Could not copy formatted markup to clipboard.", {
+            tone: "error",
+        });
+        return;
+    }
+
+    flashCopyButton();
 
     /* The one-step loop: copy and the entry resets itself for the next one. */
-    if (copied && clearAfterCopyEnabled) clearEntry();
+    const cleared = clearAfterCopyEnabled && !editorIsEmpty();
+
+    if (cleared) clearEntry();
+
+    showNotice(
+        cleared
+            ? "Copied and cleared, Ctrl+Z to undo."
+            : "Copied to clipboard!",
+    );
 }

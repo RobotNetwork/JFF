@@ -377,6 +377,10 @@ main {
     transform: translate(-50%, 8px);
 }
 
+.notice.is-error {
+    border-left-color: var(--danger);
+}
+
 /* The motion is how the notice arrives, not what it says. */
 @media (prefers-reduced-motion: reduce) {
     .notice {
@@ -675,6 +679,27 @@ main {
     color: var(--muted);
     box-shadow: none;
     cursor: default;
+}
+
+#copyBtn:not(:disabled) {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 600;
+}
+
+#copyBtn:not(:disabled):hover {
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    filter: brightness(0.92);
+}
+
+#copyBtn.is-copied,
+#copyBtn.is-copied:disabled {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 22%, var(--panel));
+    color: var(--accent-text);
+    font-weight: 600;
 }
 
 /*
