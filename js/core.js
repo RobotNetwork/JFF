@@ -134,6 +134,7 @@ function restore(step) {
 
     undoIndex = index;
     editor.innerHTML = undoStack[index].html;
+    lastEditorCaret = null;
 
     if (!applyCaret(undoStack[index].caret)) {
         placeCaretAtEnd(editor);

@@ -10,7 +10,11 @@ editor.addEventListener("input", (event) => {
      * conversion runs from the input event rather than from keydown, where
      * the space has not been inserted yet.
      */
-    if (event.inputType === "insertText" && event.data === " ") {
+    if (
+        event.inputType === "insertText" &&
+        event.data === " " &&
+        !event.isComposing
+    ) {
         applyTypedMarker();
     }
 

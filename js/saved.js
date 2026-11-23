@@ -20,12 +20,24 @@ function newRecordId() {
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function stableRecordId(name, html, index) {
+    let hash = 2166136261;
+    const input = `${index}\0${name}\0${html}`;
+
+    for (let i = 0; i < input.length; i++) {
+        hash ^= input.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+    }
+
+    return `saved-${index}-${(hash >>> 0).toString(36)}`;
+}
+
 /*
  * One shape check for a stored row and an imported one. localStorage is the
  * user's to edit and a file is theirs to write, so a row either matches or is
  * dropped: nothing here repairs half a record into one.
  */
-function savedRecord(value) {
+function savedRecord(value, index = 0) {
     if (!value || typeof value !== "object") return null;
 
     const name = typeof value.name === "string" ? value.name.trim() : "";
@@ -33,11 +45,10 @@ function savedRecord(value) {
 
     if (name === "" || html === "") return null;
 
+    const hasId = typeof value.id === "string" && value.id !== "";
+
     return {
-        id:
-            typeof value.id === "string" && value.id !== ""
-                ? value.id
-                : newRecordId(),
+        id: hasId ? value.id : stableRecordId(name, html, index),
         name: name.slice(0, savedNameLimit),
         html,
         savedAt: Number.isFinite(value.savedAt) ? value.savedAt : Date.now(),
@@ -60,7 +71,33 @@ function readSaved() {
 
     if (!Array.isArray(parsed)) return [];
 
-    return parsed.map(savedRecord).filter(Boolean);
+    let hadMissingId = false;
+    const records = [];
+
+    parsed.forEach((entry, index) => {
+        const record = savedRecord(entry, index);
+
+        if (!record) return;
+
+        if (!entry || typeof entry.id !== "string" || entry.id === "") {
+            hadMissingId = true;
+        }
+
+        records.push(record);
+    });
+
+    if (hadMissingId && storageAvailable()) {
+        try {
+            window.localStorage.setItem(
+                storageKeys.savedMessages,
+                JSON.stringify(records),
+            );
+        } catch {
+            /* Stable IDs still match across reads when storage is read-only. */
+        }
+    }
+
+    return records;
 }
 
 /* Reports a refusal rather than letting a save disappear quietly. */
@@ -266,6 +303,7 @@ function insertSavedMessage(id) {
      */
     flushSnapshot();
     editor.innerHTML = html;
+    lastEditorCaret = null;
     commitSnapshot();
 
     render();

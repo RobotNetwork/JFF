@@ -81,6 +81,7 @@ function restoreEntry() {
     }
 
     editor.innerHTML = doc.body.innerHTML;
+    lastEditorCaret = null;
 
     return true;
 }
@@ -125,6 +126,7 @@ function clearEntry() {
     flushSnapshot();
 
     editor.innerHTML = "";
+    lastEditorCaret = null;
     commitSnapshot();
 
     render();

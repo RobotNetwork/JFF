@@ -78,11 +78,15 @@ function inlineCodeEscapePoint(code, forward) {
     const text = sibling && sibling.nodeType === Node.TEXT_NODE ? sibling : null;
 
     if (!forward && text && text.data) {
-        return { node: text, offset: text.data.length };
+        return { node: text, offset: text.data.length, mutated: false };
     }
 
-    if (forward && text && text.data.startsWith(caretAnchor)) {
-        return { node: text, offset: 1 };
+    if (forward && text && text.data) {
+        return {
+            node: text,
+            offset: text.data.startsWith(caretAnchor) ? 1 : 0,
+            mutated: false,
+        };
     }
 
     flushSnapshot();
@@ -95,7 +99,7 @@ function inlineCodeEscapePoint(code, forward) {
         code.before(anchor);
     }
 
-    return { node: anchor, offset: 1 };
+    return { node: anchor, offset: 1, mutated: true };
 }
 
 /*
@@ -108,25 +112,25 @@ function inlineCodeEscapePoint(code, forward) {
 function stepOutOfInlineCode(direction) {
     const selection = window.getSelection();
 
-    if (!selection.rangeCount || !selection.isCollapsed) return false;
+    if (!selection.rangeCount || !selection.isCollapsed) return null;
 
     const range = selection.getRangeAt(0);
     const code = inlineCodeElement(range.startContainer);
 
-    if (!code) return false;
+    if (!code) return null;
 
     const forward = direction > 0;
     const atEdge = forward
         ? range.endOffset >= nodeOffset(range.endContainer)
         : range.startOffset === 0;
 
-    if (!atEdge) return false;
+    if (!atEdge) return null;
 
     const beyond = forward
         ? contentAfterCaret(code, range)
         : contentBeforeCaret(code, range);
 
-    if (!isBlankContent(beyond)) return false;
+    if (!isBlankContent(beyond)) return null;
 
     const point = inlineCodeEscapePoint(code, forward);
     const target = document.createRange();
@@ -137,7 +141,7 @@ function stepOutOfInlineCode(direction) {
     selection.removeAllRanges();
     selection.addRange(target);
 
-    return true;
+    return { stepped: true, mutated: point.mutated };
 }
 
 /*
@@ -265,16 +269,20 @@ editor.addEventListener("keydown", (event) => {
          * cannot swallow what is typed after it. The default would add its
          * own step on top of the one just taken, so it is suppressed.
          */
-        if (
-            !mod &&
-            !event.shiftKey &&
-            stepOutOfInlineCode(event.key === "ArrowRight" ? 1 : -1)
-        ) {
-            event.preventDefault();
-            queueSnapshot();
-            render();
-            updateToolbarState();
-            return;
+        if (!mod && !event.shiftKey) {
+            const exit = stepOutOfInlineCode(
+                event.key === "ArrowRight" ? 1 : -1,
+            );
+
+            if (exit) {
+                event.preventDefault();
+                if (exit.mutated) {
+                    queueSnapshot();
+                    render();
+                }
+                updateToolbarState();
+                return;
+            }
         }
     }
 
@@ -391,6 +399,29 @@ editor.addEventListener("keydown", (event) => {
     queueSnapshot();
     render();
     updateToolbarState();
+});
+
+const globalShortcutCommands = new Set(["copyOutput", "help"]);
+
+document.addEventListener("keydown", (event) => {
+    if (editor.contains(event.target)) return;
+
+    if (document.querySelector("dialog[open]")) return;
+
+    const mod = event.ctrlKey || event.metaKey;
+
+    if (!mod) return;
+
+    const shortcut = editingShortcuts.find(
+        (entry) =>
+            globalShortcutCommands.has(entry.cmd) &&
+            matchesShortcut(entry, event),
+    );
+
+    if (!shortcut) return;
+
+    event.preventDefault();
+    applyCommand(shortcut.cmd, shortcut.val);
 });
 
 /* ---------- List editing ---------- */
@@ -704,6 +735,85 @@ function caretLine(block, range) {
  * The list is built here rather than with execCommand, which Chrome ignores
  * for the length of the input event this runs in.
  */
+function precedingBreak(block, range) {
+    let cursor = range.startContainer;
+
+    if (cursor === block) {
+        cursor = block.childNodes[range.startOffset - 1] ?? null;
+    } else {
+        while (cursor && cursor.parentNode !== block) {
+            cursor = cursor.parentNode;
+        }
+        cursor = cursor ? cursor.previousSibling : null;
+    }
+
+    while (cursor) {
+        if (cursor.nodeType === Node.ELEMENT_NODE && cursor.tagName === "BR") {
+            return cursor;
+        }
+        cursor = cursor.previousSibling;
+    }
+
+    return null;
+}
+
+function textBeforeOnLine(block, range, br) {
+    const prefix = document.createRange();
+
+    if (br) {
+        prefix.setStartAfter(br);
+    } else {
+        prefix.selectNodeContents(block);
+    }
+
+    prefix.setEnd(range.startContainer, range.startOffset);
+
+    return prefix.toString();
+}
+
+function splitBlockAtBreak(block, br) {
+    const next = document.createElement("p");
+
+    while (br.nextSibling) {
+        next.appendChild(br.nextSibling);
+    }
+
+    br.remove();
+    block.after(next);
+
+    return next;
+}
+
+function switchListItemType(item, tag) {
+    const parentList = item.parentElement;
+
+    if (!parentList) return item;
+
+    const siblings = [...parentList.children];
+    const index = siblings.indexOf(item);
+    const before = siblings.slice(0, index);
+    const after = siblings.slice(index + 1);
+    const replacement = document.createElement(tag);
+
+    replacement.appendChild(item);
+
+    if (before.length === 0) {
+        parentList.before(replacement);
+        if (after.length === 0) parentList.remove();
+    } else {
+        parentList.after(replacement);
+
+        if (after.length > 0) {
+            const tail = parentList.cloneNode(false);
+
+            for (const sibling of after) tail.appendChild(sibling);
+            replacement.after(tail);
+        }
+    }
+
+    return item;
+}
+
 function applyTypedMarker() {
     const selection = window.getSelection();
 
@@ -715,13 +825,14 @@ function applyTypedMarker() {
     /* A marker inside code is code, not markup. */
     if (!block || block.closest("pre")) return false;
 
-    const prefix = textBefore(block, range);
+    const br = precedingBreak(block, range);
+    const prefix = textBeforeOnLine(block, range, br);
     const heading = prefix.match(headingMarkerPattern);
     const quote = quoteMarkerPattern.test(prefix);
 
     if (!heading && !quote && !listMarkerPattern.test(prefix)) return false;
 
-    const line = caretLine(block, range);
+    let line = caretLine(block, range);
 
     // The editor is not a line, and replacing it would take the page apart.
     if (!line || line === editor) return false;
@@ -737,8 +848,18 @@ function applyTypedMarker() {
     flushSnapshot();
 
     if (blockMarker) {
-        removeMarker(line, range, prefix);
+        removeMarker(line, range, prefix, br);
+
+        if (br && block !== editor) {
+            line = splitBlockAtBreak(block, br);
+        }
+
         formatLine(line, heading ? `h${heading[1].length}` : "blockquote");
+
+        if (br && block === editor && br.parentNode === editor) {
+            br.remove();
+        }
+
         return true;
     }
 
@@ -746,9 +867,32 @@ function applyTypedMarker() {
     const nested = /^[ \t\u00a0]/.test(prefix);
     const tag = /^[ \t\u00a0]*[-*+]/.test(prefix) ? "ul" : "ol";
 
-    removeMarker(line, range, prefix);
+    removeMarker(line, range, prefix, br);
 
-    const item = existing || listifyLine(line, tag);
+    let item = existing;
+
+    if (existing) {
+        const parentList = existing.parentElement;
+        const currentTag = parentList ? parentList.tagName.toLowerCase() : "";
+
+        if (
+            !nested &&
+            (currentTag === "ul" || currentTag === "ol") &&
+            currentTag !== tag
+        ) {
+            item = switchListItemType(existing, tag);
+        }
+    } else {
+        if (br && block !== editor) {
+            line = splitBlockAtBreak(block, br);
+        }
+
+        item = listifyLine(line, tag);
+
+        if (br && block === editor && br.parentNode === editor) {
+            br.remove();
+        }
+    }
 
     placeCaret(item);
 
@@ -882,7 +1026,7 @@ function runBeforeCaret(node, closeOffset) {
  * become the block's content, and the marker is its entire text up to the
  * caret.
  */
-function removeMarker(line, range, prefix) {
+function removeMarker(line, range, prefix, br = null) {
     if (line.nodeType === Node.TEXT_NODE) {
         line.deleteData(0, prefix.length);
         return;
@@ -890,7 +1034,12 @@ function removeMarker(line, range, prefix) {
 
     const marker = document.createRange();
 
-    marker.selectNodeContents(line);
+    if (br) {
+        marker.setStartAfter(br);
+    } else {
+        marker.selectNodeContents(line);
+    }
+
     marker.setEnd(range.startContainer, range.startOffset);
     marker.deleteContents();
 }

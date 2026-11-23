@@ -369,11 +369,13 @@ function applyCommand(cmd, value) {
  * to fails at load rather than becoming a control that quietly does nothing.
  */
 function checkCommandCoverage() {
-    for (const button of toolbar.querySelectorAll("button[data-cmd]")) {
-        const { cmd } = button.dataset;
+    for (const bar of [toolbar, editorActions]) {
+        for (const button of bar.querySelectorAll("button[data-cmd]")) {
+            const { cmd } = button.dataset;
 
-        if (!commands[cmd]) {
-            throw new Error(`Toolbar button names no command: ${cmd}`);
+            if (!commands[cmd]) {
+                throw new Error(`Toolbar button names no command: ${cmd}`);
+            }
         }
     }
 
