@@ -17,6 +17,7 @@ const previewCopy = document.getElementById("previewCopy");
 const previewClose = document.getElementById("previewClose");
 const previewBtn = document.getElementById("previewBtn");
 const copyBtn = document.getElementById("copyBtn");
+const clearBtn = document.getElementById("clearBtn");
 const toolbar = document.getElementById("toolbar");
 const editorActions = document.getElementById("editorActions");
 const notice = document.getElementById("notice");

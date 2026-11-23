@@ -17,6 +17,7 @@
      * palettes, including for an accent chosen in Settings.
      */
     --accent-text: color-mix(in srgb, var(--accent) 55%, var(--text));
+    --accent-focus: var(--accent);
     /* The code wells: the editor's pre and code, and a dialog input. */
     --code-bg: #14161a;
     /* A copy failure and a rejected link URL. */
@@ -40,7 +41,7 @@
  * Settings writes a custom accent inline, and redeclaring them would shadow
  * that choice inside the card.
  */
-:root[data-theme="light"] #editorPane {
+:root[data-theme="light"] {
     color-scheme: light;
     --bg: #f6f7f9;
     --panel: #ffffff;
@@ -55,7 +56,7 @@
     --muted: #5b636d;
 }
 
-:root[data-theme="light"] #editorPane .dropdown-menu {
+:root[data-theme="light"] .dropdown-menu {
     box-shadow: 0 6px 16px rgb(0 0 0 / 18%);
 }
 
@@ -538,7 +539,23 @@ main {
 }
 
 .resize-handle:hover {
-    background: rgba(var(--accent-rgb), 0.1);
+    background: rgba(var(--accent-rgb), 0.14);
+}
+
+.resize-handle.is-resizing {
+    background: rgba(var(--accent-rgb), 0.28);
+}
+
+body.is-resizing,
+body.is-resizing * {
+    cursor: ew-resize !important;
+    user-select: none;
+}
+
+@media (max-width: 863px) {
+    .resize-handle {
+        display: none;
+    }
 }
 
 #editor {
@@ -603,7 +620,7 @@ main {
 
 #editor:focus {
     background: rgba(var(--accent-rgb), 0.02);
-    outline: 1px solid var(--accent);
+    outline: 1px solid var(--accent-focus);
     outline-offset: -1px;
 }
 
@@ -1061,6 +1078,16 @@ main {
  * on the whole row rather than on the Saved button keeps the panel on screen
  * at any width.
  */
+.clear-entry-btn {
+    color: var(--muted);
+}
+
+.clear-entry-btn:hover:not(:disabled) {
+    border-color: var(--danger);
+    background: rgba(var(--danger-rgb), 0.12);
+    color: var(--danger);
+}
+
 .editor-actions .dropdown {
     position: static;
 }
@@ -1097,7 +1124,7 @@ main {
 }
 
 .saved-search-input:focus {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--accent-focus);
     outline-offset: -1px;
     border-color: var(--accent);
 }
@@ -1345,7 +1372,7 @@ main {
 .link-form input:focus,
 .name-form input:focus {
     border-color: var(--accent);
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--accent-focus);
     outline-offset: 1px;
 }
 

@@ -85,10 +85,36 @@ for (const bar of [toolbar, editorActions]) {
     bar.addEventListener("click", commandActivate);
 }
 
+const nonEditorFocusCommands = new Set([
+    "copyOutput",
+    "preview",
+    "help",
+    "clearEntry",
+]);
+
+function ensureEditorSelection() {
+    const selection = window.getSelection();
+    const inEditor =
+        selection.rangeCount > 0 &&
+        editor.contains(selection.getRangeAt(0).commonAncestorContainer);
+
+    if (inEditor) return;
+
+    editor.focus();
+
+    if (!applyCaret(lastEditorCaret)) {
+        placeCaretAtEnd(editor);
+    }
+}
+
 function runToolbarCommand(button) {
     flushSnapshot();
 
     const { cmd, val } = button.dataset;
+
+    if (!nonEditorFocusCommands.has(cmd)) {
+        ensureEditorSelection();
+    }
 
     /*
      * A command that defers to the link dialog owns focus until the dialog
@@ -358,6 +384,25 @@ const commands = {
             return true;
         },
     },
+    clearEntry: {
+        run: () => {
+            if (editorIsEmpty()) return true;
+
+            clearEntry();
+            showNotice(
+                `Cleared entry, ${undoShortcutLabel()} to undo.`,
+                {
+                    actionLabel: "Undo",
+                    onAction: () => {
+                        restore(-1);
+                        editor.focus();
+                    },
+                },
+            );
+
+            return true;
+        },
+    },
 };
 
 /*
@@ -552,11 +597,29 @@ function buildCodeBlock(range) {
 function wrapInlineCode() {
     const selection = window.getSelection();
 
-    if (!selection.rangeCount || selection.isCollapsed) return;
+    if (!selection.rangeCount) return;
 
     const range = selection.getRangeAt(0);
 
     if (!editor.contains(range.commonAncestorContainer)) return;
+
+    if (selection.isCollapsed) {
+        const code = document.createElement("code");
+        const sentinel = document.createTextNode("\u200b");
+
+        code.setAttribute("spellcheck", "false");
+        code.appendChild(sentinel);
+        range.insertNode(code);
+
+        const caretRange = document.createRange();
+
+        caretRange.setStart(sentinel, 1);
+        caretRange.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(caretRange);
+
+        return;
+    }
 
     /*
      * surroundContents throws when the range only partly covers an element,

@@ -113,10 +113,12 @@
             <div class="pane" id="editorPane">
                 <div
                     class="resize-handle resize-handle-left"
+                    title="Drag to resize · Double-click to reset"
                     aria-hidden="true"
                 ></div>
                 <div
                     class="resize-handle resize-handle-right"
+                    title="Drag to resize · Double-click to reset"
                     aria-hidden="true"
                 ></div>
 
@@ -443,6 +445,17 @@
                         </div>
                     </div>
                 </div>
+
+                <button
+                    type="button"
+                    id="clearBtn"
+                    class="clear-entry-btn"
+                    data-cmd="clearEntry"
+                    aria-label="Clear entry"
+                    disabled
+                >
+                    Clear
+                </button>
             </div>
         </main>
 

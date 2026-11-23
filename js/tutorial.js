@@ -99,7 +99,7 @@ tutorialDialog.addEventListener("close", () => {
         settingsBtn.focus();
     } else if (
         focusEditorAfterClose &&
-        matchMedia("(min-width: 801px)").matches
+        matchMedia("(pointer: fine)").matches
     ) {
         editor.focus();
     }

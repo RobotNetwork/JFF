@@ -118,6 +118,6 @@ maybeShowTutorial();
 /* The tool's one job is a paste, so the caret is waiting for it. A phone gets
    no focus: a keyboard popped open on load is worse there than the one tap it
    saves. */
-if (!tutorialDialog.open && matchMedia("(min-width: 801px)").matches) {
+if (!tutorialDialog.open && matchMedia("(pointer: fine)").matches) {
     editor.focus();
 }

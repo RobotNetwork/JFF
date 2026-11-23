@@ -9,6 +9,7 @@ const storageKeys = {
     accent: "accent",
     clearAfterCopy: "clearAfterCopy",
     tutorialHidden: "tutorialHidden",
+    editorWidth: "editorWidth",
 };
 
 /*
