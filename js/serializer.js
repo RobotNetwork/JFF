@@ -89,9 +89,22 @@ function wrapCode(html) {
 function normalizeHref(value) {
     const href = value.trim();
 
-    if (/^(https?:|mailto:|tel:)/i.test(href)) return href;
+    if (!href || /[\s\u0000-\u001f]/.test(href)) return "";
 
-    if (href.startsWith("#")) return href;
+    if (/^https?:\/\/[^/\\]/i.test(href)) {
+        try {
+            const url = new URL(href);
+            return url.hostname ? href : "";
+        } catch {
+            return "";
+        }
+    }
+
+    if (/^mailto:[^\s@]+@[^\s@]+/i.test(href)) return href;
+
+    if (/^tel:[+\d().\-*#]+$/i.test(href) && /\d/.test(href)) return href;
+
+    if (href.startsWith("#") && href.length > 1) return href;
 
     /*
      * A single leading slash is a same-site path. Two of them, or a slash
@@ -106,6 +119,10 @@ function normalizeHref(value) {
     }
 
     return "";
+}
+
+function isAbsoluteHref(href) {
+    return /^(?:https?:\/\/|mailto:|tel:)/i.test(href);
 }
 
 /*
@@ -235,6 +252,38 @@ function codeText(element) {
     return text;
 }
 
+const sentinelBrParents = new Set([
+    "p",
+    "div",
+    "li",
+    "blockquote",
+    ...headingLevels,
+]);
+
+function isSentinelBr(node) {
+    const parent = node.parentNode;
+
+    if (
+        !parent ||
+        parent.nodeType !== Node.ELEMENT_NODE ||
+        !sentinelBrParents.has(parent.tagName.toLowerCase())
+    ) {
+        return false;
+    }
+
+    for (let sibling = node.nextSibling; sibling; sibling = sibling.nextSibling) {
+        if (sibling.nodeType === Node.ELEMENT_NODE) return false;
+        if (
+            sibling.nodeType === Node.TEXT_NODE &&
+            sibling.textContent.replace(/\u200b/g, "") !== ""
+        ) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 function serializeHtmlElement(element) {
     const tag = element.tagName.toLowerCase();
 
@@ -265,24 +314,24 @@ function serializeHtmlElement(element) {
     switch (tag) {
         case "b":
         case "strong":
-            return `<b>${inner}</b>`;
+            return inner ? `<b>${inner}</b>` : "";
 
         case "i":
         case "em":
-            return `<em>${inner}</em>`;
+            return inner ? `<em>${inner}</em>` : "";
 
         case "s":
         case "strike":
         case "del":
-            return `<strike>${inner}</strike>`;
+            return inner ? `<strike>${inner}</strike>` : "";
 
         case "u":
         case "ins":
-            return `<u>${inner}</u>`;
+            return inner ? `<u>${inner}</u>` : "";
 
         case "code":
             // Intentionally bold inline code for ServiceNow readability.
-            return `<b><code>${inner}</code></b>`;
+            return inner ? `<b><code>${inner}</code></b>` : "";
 
         case "blockquote":
             return `<blockquote>${inner}</blockquote>`;
@@ -293,6 +342,7 @@ function serializeHtmlElement(element) {
             );
 
             if (!href) return inner;
+            if (!inner) return "";
 
             const safeHref = href.replace(
                 /^(https?:\/\/\[[0-9a-f:.]+\])|[\[\]]/gi,
@@ -310,6 +360,12 @@ function serializeHtmlElement(element) {
             return `<li>${inner}</li>`;
 
         case "br":
+            /*
+             * Browser sentinel <br> tags at the end of empty or trailing blocks
+             * are placeholders for the caret, not real line breaks.
+             */
+            if (isSentinelBr(element)) return "";
+
             /*
              * ServiceNow strips ordinary newlines and <br> inside [code].
              * This is one of the few places where <p></p> is necessary.
@@ -369,6 +425,9 @@ function serializeNode(node, insideCode = false) {
 
     if (inlineTags.has(tag) || blockTags.has(tag)) {
         const html = serializeHtmlElement(node);
+
+        if (!html) return "";
+
         const suffix = blockTags.has(tag) ? "\n" : "";
 
         return `${wrapCode(html)}${suffix}`;

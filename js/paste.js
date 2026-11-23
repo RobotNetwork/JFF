@@ -74,7 +74,7 @@ function sanitizeEntryHtml(html) {
 
     normalizeRichTextWhitespace(doc.body);
 
-    if (doc.body.textContent.trim() === "") {
+    if (isEmptyContent(doc.body)) {
         return { html: "", dropped };
     }
 
@@ -107,7 +107,7 @@ function pastedLinkHref(dataTransfer) {
     if (text !== "" && !/\s/.test(text)) {
         const href = normalizeHref(text);
 
-        if (href) return href;
+        if (href && isAbsoluteHref(href)) return href;
     }
 
     const html = dataTransfer.getData("text/html");
@@ -128,7 +128,9 @@ function pastedLinkHref(dataTransfer) {
         return "";
     }
 
-    return normalizeHref(anchors[0].getAttribute("href"));
+    const href = normalizeHref(anchors[0].getAttribute("href") || "");
+
+    return isAbsoluteHref(href) ? href : "";
 }
 
 /*

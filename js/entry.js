@@ -76,7 +76,7 @@ function restoreEntry() {
 
     const doc = parseStoredEntry(stored);
 
-    if (doc.body.textContent.trim() === "" && !doc.body.querySelector("pre")) {
+    if (isEmptyContent(doc.body)) {
         return false;
     }
 

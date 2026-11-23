@@ -460,6 +460,11 @@ function sanitizeRichText(doc) {
             }
         }
 
+        if (element.tagName === "A" && !element.hasAttribute("href")) {
+            unwrapElement(element);
+            return;
+        }
+
         if (element.tagName === "CODE" || element.tagName === "PRE") {
             element.setAttribute("spellcheck", "false");
         }

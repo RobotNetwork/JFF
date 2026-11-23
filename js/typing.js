@@ -105,11 +105,15 @@ const structureSelector = [
     ...headingLevels,
 ].join(", ");
 
-function editorIsEmpty() {
+function isEmptyContent(root) {
     return (
-        editor.textContent.replace(/\u200b/g, "").trim() === "" &&
-        !editor.querySelector(structureSelector)
+        root.textContent.replace(/\u200b/g, "").trim() === "" &&
+        !root.querySelector(structureSelector)
     );
+}
+
+function editorIsEmpty() {
+    return isEmptyContent(editor);
 }
 
 function updatePlaceholder() {
