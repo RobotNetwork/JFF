@@ -10,6 +10,14 @@
  * selection, so the reader's own selection is left alone.
  */
 function copyViaExecCommand(text) {
+    const active = document.activeElement;
+    const selection = window.getSelection();
+    const savedRanges = [];
+
+    for (let i = 0; i < selection.rangeCount; i++) {
+        savedRanges.push(selection.getRangeAt(i).cloneRange());
+    }
+
     const area = document.createElement("textarea");
 
     area.value = text;
@@ -30,6 +38,15 @@ function copyViaExecCommand(text) {
 
     area.remove();
 
+    if (active && typeof active.focus === "function" && active.isConnected) {
+        active.focus({ preventScroll: true });
+    }
+
+    selection.removeAllRanges();
+    for (const range of savedRanges) {
+        selection.addRange(range);
+    }
+
     return copied;
 }
 
@@ -40,6 +57,8 @@ function copyViaExecCommand(text) {
  */
 async function copyOutput() {
     const text = serializedBody();
+
+    if (text === "") return;
 
     let copied = false;
 
@@ -57,7 +76,7 @@ async function copyOutput() {
     showNotice(
         copied
             ? "Copied to clipboard!"
-            : "Could not copy markdown to clipboard.",
+            : "Could not copy formatted markup to clipboard.",
     );
 
     /* The one-step loop: copy and the entry resets itself for the next one. */

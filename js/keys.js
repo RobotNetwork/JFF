@@ -47,6 +47,13 @@ const editingShortcuts = [
 ];
 
 function matchesShortcut(shortcut, event) {
+    if (
+        typeof event.getModifierState === "function" &&
+        event.getModifierState("AltGraph")
+    ) {
+        return false;
+    }
+
     const chord = shortcut.code
         ? shortcut.code === event.code
         : shortcut.key === event.key.toLowerCase();

@@ -52,7 +52,10 @@ function saveEntry() {
 }
 
 function queueSave() {
-    if (!storageAvailable()) return;
+    if (!storageAvailable()) {
+        setSaveState(true);
+        return;
+    }
 
     clearTimeout(saveTimer);
     saveTimer = setTimeout(saveEntry, saveDelay);
