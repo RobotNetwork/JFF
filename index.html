@@ -413,6 +413,18 @@
                         id="savedMenu"
                         hidden
                     >
+                        <div class="saved-search" id="savedSearchRow" hidden>
+                            <input
+                                type="search"
+                                id="savedSearch"
+                                class="saved-search-input"
+                                placeholder="Filter saved messages…"
+                                aria-label="Filter saved messages"
+                                autocomplete="off"
+                                spellcheck="false"
+                            />
+                        </div>
+
                         <p class="saved-empty" id="savedEmpty">
                             No saved messages yet. Save one.
                         </p>
@@ -621,6 +633,11 @@
                     spellcheck="false"
                     maxlength="120"
                 />
+
+                <label class="name-duplicate" id="nameDuplicateRow" hidden>
+                    <input type="checkbox" id="nameOverwrite" />
+                    <span>A saved message with this name already exists. Overwrite existing</span>
+                </label>
 
                 <div class="dialog-actions">
                     <button type="button" id="nameCancel">Cancel</button>

@@ -155,11 +155,17 @@ function savedPreview(html) {
         : text;
 }
 
-function savedRow(record) {
+const savedSearchThreshold = 5;
+
+function savedRow(record, entryEmpty) {
     const item = document.createElement("li");
     const insert = document.createElement("button");
     const name = document.createElement("span");
     const preview = document.createElement("span");
+    const controls = document.createElement("div");
+    const insertAtCaret = document.createElement("button");
+    const rename = document.createElement("button");
+    const update = document.createElement("button");
     const remove = document.createElement("button");
 
     item.className = "saved-item";
@@ -167,6 +173,7 @@ function savedRow(record) {
     insert.type = "button";
     insert.className = "saved-insert";
     insert.dataset.id = record.id;
+    insert.title = `Replace current entry with "${record.name}"`;
 
     name.className = "saved-name";
     name.textContent = record.name;
@@ -176,35 +183,101 @@ function savedRow(record) {
 
     insert.append(name, preview);
 
+    controls.className = "saved-row-controls";
+
+    insertAtCaret.type = "button";
+    insertAtCaret.className = "saved-row-btn saved-caret-insert";
+    insertAtCaret.dataset.id = record.id;
+    insertAtCaret.textContent = "+";
+    insertAtCaret.setAttribute("aria-label", `Insert "${record.name}" at cursor`);
+    insertAtCaret.title = "Insert at cursor";
+
+    rename.type = "button";
+    rename.className = "saved-row-btn saved-rename";
+    rename.dataset.id = record.id;
+    rename.textContent = "✎";
+    rename.setAttribute("aria-label", `Rename "${record.name}"`);
+    rename.title = "Rename";
+
+    update.type = "button";
+    update.className = "saved-row-btn saved-update";
+    update.dataset.id = record.id;
+    update.textContent = "↻";
+    update.disabled = entryEmpty;
+    update.setAttribute(
+        "aria-label",
+        `Update "${record.name}" with current entry`,
+    );
+    update.title = "Update with current entry";
+
     remove.type = "button";
-    remove.className = "saved-delete";
+    remove.className = "saved-row-btn saved-delete";
     remove.dataset.id = record.id;
     remove.textContent = "✕";
     remove.setAttribute("aria-label", `Delete "${record.name}"`);
+    remove.title = "Delete";
 
-    item.append(insert, remove);
+    controls.append(insertAtCaret, rename, update, remove);
+    item.append(insert, controls);
 
     return item;
 }
 
 function renderSavedMenu() {
     const records = readSaved();
+    const showSearch = records.length >= savedSearchThreshold;
 
-    savedEmpty.hidden = records.length > 0;
-    savedList.replaceChildren(...records.map(savedRow));
-    savedSaveBtn.disabled = editorIsEmpty();
+    savedSearchRow.hidden = !showSearch;
+    if (!showSearch) savedSearch.value = "";
+
+    const query = showSearch ? savedSearch.value.trim().toLowerCase() : "";
+    const filtered = query
+        ? records.filter(
+              (record) =>
+                  record.name.toLowerCase().includes(query) ||
+                  savedPreview(record.html).toLowerCase().includes(query),
+          )
+        : records;
+
+    const entryEmpty = editorIsEmpty();
+
+    if (records.length === 0) {
+        savedEmpty.textContent = "No saved messages yet. Save one.";
+        savedEmpty.hidden = false;
+    } else if (filtered.length === 0) {
+        savedEmpty.textContent = "No matching saved messages.";
+        savedEmpty.hidden = false;
+    } else {
+        savedEmpty.hidden = true;
+    }
+
+    savedList.replaceChildren(
+        ...filtered.map((record) => savedRow(record, entryEmpty)),
+    );
+    savedSaveBtn.disabled = entryEmpty;
 }
 
 function setSavedMenuOpen(open, focusFirst = false) {
-    if (open) renderSavedMenu();
+    if (open) {
+        savedSearch.value = "";
+        renderSavedMenu();
+    }
 
     savedMenu.hidden = !open;
     savedToggle.setAttribute("aria-expanded", String(open));
 
     if (open && focusFirst) {
-        (savedList.querySelector(".saved-insert") ?? savedSaveBtn).focus();
+        if (!savedSearchRow.hidden) {
+            savedSearch.focus();
+        } else {
+            (savedList.querySelector(".saved-insert") ?? savedSaveBtn).focus();
+        }
     }
 }
+
+savedSearch.addEventListener("input", () => {
+    renderSavedMenu();
+});
 
 /*
  * The press is kept from moving focus, so the caret a row will insert at is
@@ -264,7 +337,9 @@ if (savedDropdown) {
 
 /* A row is a press target, and the press must leave the caret alone. */
 savedList.addEventListener("mousedown", (event) => {
-    if (event.target.closest(".saved-insert")) event.preventDefault();
+    if (event.target.closest(".saved-insert, .saved-caret-insert")) {
+        event.preventDefault();
+    }
 });
 
 savedList.addEventListener("click", (event) => {
@@ -272,6 +347,27 @@ savedList.addEventListener("click", (event) => {
 
     if (insert) {
         insertSavedMessage(insert.dataset.id);
+        return;
+    }
+
+    const caretInsert = event.target.closest(".saved-caret-insert");
+
+    if (caretInsert) {
+        insertSavedAtCaret(caretInsert.dataset.id);
+        return;
+    }
+
+    const rename = event.target.closest(".saved-rename");
+
+    if (rename) {
+        renameSavedMessage(rename.dataset.id);
+        return;
+    }
+
+    const update = event.target.closest(".saved-update");
+
+    if (update) {
+        updateSavedMessage(update.dataset.id);
         return;
     }
 
@@ -309,18 +405,119 @@ function insertSavedMessage(id) {
     render();
     updateToolbarState();
     editor.focus();
+    showNotice(`Loaded "${record.name}", Ctrl+Z to undo.`);
+}
+
+function insertSavedAtCaret(id) {
+    const record = readSaved().find((entry) => entry.id === id);
+
+    if (!record) return;
+
+    setSavedMenuOpen(false);
+
+    const { html } = sanitizeEntryHtml(record.html);
+
+    if (html === "") {
+        showNotice(`"${record.name}" holds nothing to insert.`, {
+            tone: "error",
+        });
+        return;
+    }
+
+    flushSnapshot();
+    editor.focus();
+
+    const selection = window.getSelection();
+    const inEditor =
+        selection.rangeCount > 0 &&
+        editor.contains(selection.getRangeAt(0).commonAncestorContainer);
+
+    if (!inEditor) {
+        if (!applyCaret(lastEditorCaret)) {
+            placeCaretAtEnd(editor);
+        }
+    }
+
+    insertHtmlAtCursor(html);
+    commitSnapshot();
+    showNotice(`Inserted "${record.name}".`);
+}
+
+function renameSavedMessage(id) {
+    const record = readSaved().find((entry) => entry.id === id);
+
+    if (!record) return;
+
+    setSavedMenuOpen(false);
+    openRenameDialog(record);
+}
+
+function updateSavedMessage(id) {
+    if (editorIsEmpty()) return;
+
+    const records = readSaved();
+    const index = records.findIndex((entry) => entry.id === id);
+
+    if (index === -1) return;
+
+    const previous = { ...records[index] };
+
+    records[index] = {
+        ...previous,
+        html: editor.innerHTML,
+        savedAt: Date.now(),
+    };
+
+    if (!writeSaved(records)) return;
+
+    renderSavedMenu();
+    showNotice(`Updated "${previous.name}".`, {
+        actionLabel: "Undo",
+        onAction: () => {
+            const current = readSaved();
+            const target = current.findIndex((entry) => entry.id === previous.id);
+
+            if (target === -1) return;
+
+            current[target] = previous;
+            if (writeSaved(current)) {
+                if (!savedMenu.hidden) renderSavedMenu();
+                showNotice(`Reverted "${previous.name}".`);
+            }
+        },
+    });
+}
+
+function restoreDeletedSaved(record, index) {
+    const records = readSaved();
+
+    if (records.some((entry) => entry.id === record.id)) return;
+
+    const at = Math.min(Math.max(index, 0), records.length);
+
+    records.splice(at, 0, record);
+
+    if (!writeSaved(records)) return;
+
+    if (!savedMenu.hidden) renderSavedMenu();
+    showNotice(`Restored "${record.name}".`);
 }
 
 function deleteSavedMessage(id) {
     const records = readSaved();
-    const record = records.find((entry) => entry.id === id);
+    const index = records.findIndex((entry) => entry.id === id);
 
-    if (!record) return;
+    if (index === -1) return;
+
+    const record = records[index];
 
     if (!writeSaved(records.filter((entry) => entry.id !== id))) return;
 
     renderSavedMenu();
-    showNotice(`Deleted "${record.name}".`);
+    showNotice(`Deleted "${record.name}".`, {
+        actionLabel: "Undo",
+        onAction: () => restoreDeletedSaved(record, index),
+    });
 
     /* The row that held the focus is gone with it. */
     if (!savedMenu.hidden && document.activeElement === document.body) {

@@ -13,12 +13,27 @@ const droppedMediaSelector =
     "img, svg, iframe, video, audio, canvas, object, embed";
 
 const noticeDelay = 5000;
+const noticeActionDelay = 7000;
 
 let noticeTimer = null;
 let noticeFrame = null;
 
-function showNotice(message, { tone = "status" } = {}) {
+function hideNotice() {
+    clearTimeout(noticeTimer);
+    noticeTimer = null;
+    if (noticeFrame !== null && typeof cancelAnimationFrame === "function") {
+        cancelAnimationFrame(noticeFrame);
+        noticeFrame = null;
+    }
+    notice.classList.remove("is-visible", "has-action");
+}
+
+function showNotice(
+    message,
+    { tone = "status", actionLabel = "", onAction = null } = {},
+) {
     const isError = tone === "error";
+    const hasAction = Boolean(actionLabel && typeof onAction === "function");
 
     clearTimeout(noticeTimer);
     if (noticeFrame !== null && typeof cancelAnimationFrame === "function") {
@@ -29,12 +44,33 @@ function showNotice(message, { tone = "status" } = {}) {
     notice.setAttribute("role", isError ? "alert" : "status");
     notice.setAttribute("aria-live", isError ? "assertive" : "polite");
     notice.classList.toggle("is-error", isError);
+    notice.classList.toggle("has-action", hasAction);
     notice.textContent = "";
     notice.classList.add("is-visible");
 
     const commit = () => {
         noticeFrame = null;
-        notice.textContent = message;
+
+        if (!hasAction) {
+            notice.textContent = message;
+            return;
+        }
+
+        const text = document.createElement("span");
+        const button = document.createElement("button");
+
+        text.className = "notice-text";
+        text.textContent = message;
+
+        button.type = "button";
+        button.className = "notice-action";
+        button.textContent = actionLabel;
+        button.addEventListener("click", () => {
+            hideNotice();
+            onAction();
+        });
+
+        notice.replaceChildren(text, button);
     };
 
     if (typeof requestAnimationFrame === "function") {
@@ -45,8 +81,8 @@ function showNotice(message, { tone = "status" } = {}) {
 
     noticeTimer = setTimeout(() => {
         noticeTimer = null;
-        notice.classList.remove("is-visible");
-    }, noticeDelay);
+        notice.classList.remove("is-visible", "has-action");
+    }, hasAction ? noticeActionDelay : noticeDelay);
 }
 
 /*

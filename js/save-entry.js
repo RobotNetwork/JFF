@@ -19,11 +19,47 @@ function firstLineOfEntry() {
     return (line ?? "").slice(0, 40);
 }
 
+let renamingRecordId = null;
+
+function findSavedByName(records, name, excludeId = null) {
+    const needle = name.trim().toLowerCase();
+
+    if (needle === "") return null;
+
+    return (
+        records.find(
+            (entry) =>
+                entry.id !== excludeId &&
+                entry.name.trim().toLowerCase() === needle,
+        ) ?? null
+    );
+}
+
 function updateNameSubmit() {
-    nameSubmit.disabled = nameInput.value.trim() === "";
+    const name = nameInput.value.trim();
+
+    nameSubmit.disabled = name === "";
+
+    if (renamingRecordId) {
+        nameDuplicateRow.hidden = true;
+        nameOverwrite.checked = false;
+        nameSubmit.textContent = "Rename";
+        return;
+    }
+
+    const duplicate = findSavedByName(readSaved(), name);
+
+    nameDuplicateRow.hidden = !duplicate;
+    if (!duplicate) nameOverwrite.checked = false;
+
+    nameSubmit.textContent =
+        duplicate && nameOverwrite.checked ? "Overwrite" : "Save";
 }
 
 function openNameDialog() {
+    renamingRecordId = null;
+    nameDialogTitle.textContent = "Save message";
+    nameOverwrite.checked = false;
     nameInput.value = firstLineOfEntry();
     updateNameSubmit();
 
@@ -33,12 +69,25 @@ function openNameDialog() {
     nameInput.select();
 }
 
+function openRenameDialog(record) {
+    renamingRecordId = record.id;
+    nameDialogTitle.textContent = "Rename message";
+    nameOverwrite.checked = false;
+    nameInput.value = record.name;
+    updateNameSubmit();
+
+    if (!nameDialog.open) nameDialog.showModal();
+
+    nameInput.select();
+}
+
 savedSaveBtn.addEventListener("click", () => {
     setSavedMenuOpen(false);
     openNameDialog();
 });
 
 nameInput.addEventListener("input", updateNameSubmit);
+nameOverwrite.addEventListener("change", updateNameSubmit);
 
 nameCancel.addEventListener("click", () => {
     nameDialog.close();
@@ -52,6 +101,57 @@ nameForm.addEventListener("submit", (event) => {
     if (name === "") return;
 
     const records = readSaved();
+
+    if (renamingRecordId) {
+        const index = records.findIndex(
+            (entry) => entry.id === renamingRecordId,
+        );
+
+        if (index !== -1) {
+            records[index] = { ...records[index], name };
+            if (writeSaved(records)) showNotice(`Renamed to "${name}".`);
+        }
+
+        nameDialog.close();
+        return;
+    }
+
+    const duplicate = findSavedByName(records, name);
+
+    if (duplicate && nameOverwrite.checked) {
+        const index = records.findIndex((entry) => entry.id === duplicate.id);
+        const previous = { ...records[index] };
+
+        records[index] = {
+            ...previous,
+            name,
+            html: editor.innerHTML,
+            savedAt: Date.now(),
+        };
+
+        if (writeSaved(records)) {
+            showNotice(`Updated "${name}".`, {
+                actionLabel: "Undo",
+                onAction: () => {
+                    const current = readSaved();
+                    const target = current.findIndex(
+                        (entry) => entry.id === previous.id,
+                    );
+
+                    if (target === -1) return;
+
+                    current[target] = previous;
+                    if (writeSaved(current)) {
+                        if (!savedMenu.hidden) renderSavedMenu();
+                        showNotice(`Reverted "${previous.name}".`);
+                    }
+                },
+            });
+        }
+
+        nameDialog.close();
+        return;
+    }
 
     records.push({
         id: newRecordId(),
@@ -74,5 +174,8 @@ closeOnBackdrop(nameDialog, () => {
  * the caret goes back to where it was rather than to the menu it came from.
  */
 nameDialog.addEventListener("close", () => {
+    renamingRecordId = null;
+    nameOverwrite.checked = false;
+    nameDuplicateRow.hidden = true;
     editor.focus();
 });

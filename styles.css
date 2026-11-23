@@ -384,6 +384,31 @@ main {
     border-left-color: var(--danger);
 }
 
+.notice.has-action {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    pointer-events: auto;
+}
+
+.notice-action {
+    flex: none;
+    padding: 3px 9px;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--accent-text);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.notice-action:hover {
+    border-color: var(--accent);
+    background: rgba(var(--accent-rgb), 0.18);
+}
+
 /* The motion is how the notice arrives, not what it says. */
 @media (prefers-reduced-motion: reduce) {
     .notice {
@@ -1052,6 +1077,31 @@ main {
     gap: 6px;
 }
 
+.saved-search {
+    padding-bottom: 4px;
+}
+
+.saved-search[hidden] {
+    display: none;
+}
+
+.saved-search-input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--code-bg);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12.5px;
+}
+
+.saved-search-input:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+    border-color: var(--accent);
+}
+
 .saved-empty {
     margin: 0;
     padding: 6px 8px;
@@ -1126,9 +1176,27 @@ main {
     text-overflow: ellipsis;
 }
 
-.saved-delete {
+.saved-row-controls {
     flex: none;
-    padding: 0 8px;
+    display: flex;
+    align-items: stretch;
+    gap: 1px;
+}
+
+.saved-row-btn {
+    flex: none;
+    padding: 0 7px;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.saved-row-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.saved-row-btn:disabled:hover {
+    background: transparent;
     color: var(--muted);
 }
 
@@ -1136,6 +1204,25 @@ main {
     border-color: var(--danger);
     background: rgba(var(--danger-rgb), 0.12);
     color: var(--danger);
+}
+
+.name-duplicate {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 12.5px;
+    line-height: 1.35;
+    cursor: pointer;
+}
+
+.name-duplicate[hidden] {
+    display: none;
+}
+
+.name-duplicate input {
+    margin-top: 2px;
 }
 
 /* The rule above outranks the user agent's display:none for [hidden]. */
