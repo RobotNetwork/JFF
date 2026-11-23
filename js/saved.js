@@ -158,6 +158,7 @@ function savedPreview(html) {
 }
 
 const savedSearchThreshold = 5;
+let renderingSavedMenu = false;
 
 function savedRow(record, entryEmpty) {
     const item = document.createElement("li");
@@ -226,37 +227,88 @@ function savedRow(record, entryEmpty) {
 }
 
 function renderSavedMenu() {
-    const records = readSaved();
-    const showSearch = records.length >= savedSearchThreshold;
+    const active = document.activeElement;
+    const wasInList = savedList.contains(active);
+    const activeId = wasInList ? active?.dataset?.id ?? null : null;
+    const activeAction = wasInList
+        ? [
+              "saved-insert",
+              "saved-caret-insert",
+              "saved-rename",
+              "saved-update",
+              "saved-delete",
+          ].find((cls) => active.classList.contains(cls))
+        : null;
+    const activeItem = wasInList ? active?.closest?.(".saved-item") : null;
+    const activeIndex = activeItem
+        ? [...savedList.children].indexOf(activeItem)
+        : -1;
 
-    savedSearchRow.hidden = !showSearch;
-    if (!showSearch) savedSearch.value = "";
+    renderingSavedMenu = true;
 
-    const query = showSearch ? savedSearch.value.trim().toLowerCase() : "";
-    const filtered = query
-        ? records.filter(
-              (record) =>
-                  record.name.toLowerCase().includes(query) ||
-                  savedPreview(record.html).toLowerCase().includes(query),
-          )
-        : records;
+    try {
+        const records = readSaved();
+        const showSearch = records.length >= savedSearchThreshold;
 
-    const entryEmpty = editorIsEmpty();
+        savedSearchRow.hidden = !showSearch;
+        if (!showSearch) savedSearch.value = "";
 
-    if (records.length === 0) {
-        savedEmpty.textContent = "No saved messages yet. Save one.";
-        savedEmpty.hidden = false;
-    } else if (filtered.length === 0) {
-        savedEmpty.textContent = "No matching saved messages.";
-        savedEmpty.hidden = false;
-    } else {
-        savedEmpty.hidden = true;
+        const query = showSearch ? savedSearch.value.trim().toLowerCase() : "";
+        const filtered = query
+            ? records.filter(
+                  (record) =>
+                      record.name.toLowerCase().includes(query) ||
+                      savedPreview(record.html).toLowerCase().includes(query),
+              )
+            : records;
+
+        const entryEmpty = editorIsEmpty();
+
+        if (records.length === 0) {
+            savedEmpty.textContent = "No saved messages yet. Save one.";
+            savedEmpty.hidden = false;
+        } else if (filtered.length === 0) {
+            savedEmpty.textContent = "No matching saved messages.";
+            savedEmpty.hidden = false;
+        } else {
+            savedEmpty.hidden = true;
+        }
+
+        savedList.replaceChildren(
+            ...filtered.map((record) => savedRow(record, entryEmpty)),
+        );
+        savedSaveBtn.disabled = entryEmpty;
+
+        if (wasInList && !savedMenu.hidden) {
+            let nextFocus = null;
+
+            if (activeId && activeAction) {
+                nextFocus =
+                    [...savedList.querySelectorAll(`.${activeAction}`)].find(
+                        (button) => button.dataset.id === activeId,
+                    ) ?? null;
+            }
+
+            if (!nextFocus && activeIndex >= 0) {
+                const items = savedList.querySelectorAll(".saved-insert");
+
+                nextFocus =
+                    items[Math.min(activeIndex, items.length - 1)] ?? null;
+            }
+
+            if (!nextFocus) {
+                nextFocus =
+                    savedList.querySelector(".saved-insert") ??
+                    (!savedSaveBtn.disabled ? savedSaveBtn : null) ??
+                    (!savedSearchRow.hidden ? savedSearch : null) ??
+                    (!savedToggle.disabled ? savedToggle : null);
+            }
+
+            if (nextFocus) nextFocus.focus();
+        }
+    } finally {
+        renderingSavedMenu = false;
     }
-
-    savedList.replaceChildren(
-        ...filtered.map((record) => savedRow(record, entryEmpty)),
-    );
-    savedSaveBtn.disabled = entryEmpty;
 }
 
 function updateSavedToggleState(savedCount = readSaved().length) {
@@ -336,7 +388,7 @@ savedMenu.addEventListener("keydown", (event) => {
 
 if (savedDropdown) {
     savedDropdown.addEventListener("focusout", (event) => {
-        if (savedMenu.hidden) return;
+        if (savedMenu.hidden || renderingSavedMenu) return;
 
         if (
             event.relatedTarget &&
@@ -348,6 +400,13 @@ if (savedDropdown) {
         setSavedMenuOpen(false);
     });
 }
+
+/* Clicking empty padding inside the menu should not blur search and close it. */
+savedMenu.addEventListener("mousedown", (event) => {
+    if (event.button === 0 && !event.target.closest("input, button")) {
+        event.preventDefault();
+    }
+});
 
 /* A row is a press target, and the press must leave the caret alone. */
 savedList.addEventListener("mousedown", (event) => {

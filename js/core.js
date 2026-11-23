@@ -284,6 +284,94 @@ function placeCaretAtEnd(element) {
     selection.addRange(range);
 }
 
+function fragmentHasBlockElement(root) {
+    for (const element of root.querySelectorAll("*")) {
+        if (blockLevelTags.has(element.tagName.toLowerCase())) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function singleInlineParagraph(fragment) {
+    const meaningful = [...fragment.childNodes].filter(
+        (node) =>
+            node.nodeType === Node.ELEMENT_NODE ||
+            (node.nodeType === Node.TEXT_NODE && node.data !== ""),
+    );
+
+    if (meaningful.length !== 1) return null;
+
+    const only = meaningful[0];
+
+    if (only.nodeType !== Node.ELEMENT_NODE) return null;
+
+    const tag = only.tagName.toLowerCase();
+
+    if (tag !== "p" && tag !== "div") return null;
+
+    return fragmentHasBlockElement(only) ? null : only;
+}
+
+function enclosingInsertBlock(node) {
+    let cur = closestElement(node);
+
+    while (cur && cur !== editor) {
+        const tag = cur.tagName.toLowerCase();
+
+        if (tag === "p" || tag === "div" || headingLevels.includes(tag)) {
+            return cur;
+        }
+
+        if (tag === "li" || tag === "blockquote" || tag === "pre") {
+            return null;
+        }
+
+        cur = cur.parentElement;
+    }
+
+    return null;
+}
+
+function topInlineInEditor(node) {
+    let cur = closestElement(node);
+    let top = null;
+
+    while (cur && cur !== editor) {
+        if (blockLevelTags.has(cur.tagName.toLowerCase())) return null;
+        top = cur;
+        cur = cur.parentElement;
+    }
+
+    return top;
+}
+
+function hasMeaningfulContent(root) {
+    if (root.textContent.replace(/\u200b/g, "") !== "") return true;
+
+    return Boolean(root.querySelector("*:not(br)"));
+}
+
+function placeCaretAfterInserted(node, selection) {
+    if (!node) return;
+
+    if (
+        node.nodeType === Node.ELEMENT_NODE &&
+        blockLevelTags.has(node.tagName.toLowerCase())
+    ) {
+        placeCaretAtEnd(node);
+        return;
+    }
+
+    const range = document.createRange();
+
+    range.setStartAfter(node);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+}
+
 function insertHtmlAtCursor(html) {
     const selection = window.getSelection();
 
@@ -301,16 +389,93 @@ function insertHtmlAtCursor(html) {
     range.deleteContents();
 
     const fragment = range.createContextualFragment(html);
-    const lastNode = fragment.lastChild;
+    const singlePara = singleInlineParagraph(fragment);
 
-    range.insertNode(fragment);
+    /*
+     * A single-paragraph paste (such as inline Markdown `code` or a one-line
+     * saved snippet) inserted inside an existing line or block unwraps to
+     * inline nodes rather than nesting a <p> inside the line.
+     */
+    if (singlePara && range.startContainer !== editor) {
+        const host = enclosingInsertBlock(range.startContainer);
 
-    if (lastNode) {
-        range.setStartAfter(lastNode);
-        range.collapse(true);
+        if (
+            host &&
+            host.childNodes.length === 1 &&
+            host.firstChild.nodeName === "BR"
+        ) {
+            host.firstChild.remove();
+            range.setStart(host, 0);
+            range.collapse(true);
+        }
 
-        selection.removeAllRanges();
-        selection.addRange(range);
+        singlePara.replaceWith(...singlePara.childNodes);
+    }
+
+    let lastNode = fragment.lastChild;
+
+    if (fragmentHasBlockElement(fragment)) {
+        const hostBlock = enclosingInsertBlock(range.startContainer);
+        const topInline = hostBlock
+            ? null
+            : topInlineInEditor(range.startContainer);
+
+        if (hostBlock) {
+            const tailRange = document.createRange();
+
+            tailRange.setStart(range.startContainer, range.startOffset);
+            tailRange.setEnd(hostBlock, hostBlock.childNodes.length);
+
+            const tail = tailRange.extractContents();
+
+            stripEmptyInlineWrappers(tail);
+            stripEmptyInlineWrappers(hostBlock);
+
+            hostBlock.after(fragment);
+
+            if (hasMeaningfulContent(tail)) {
+                const tailBlock = document.createElement(
+                    hostBlock.tagName.toLowerCase() === "div" ? "div" : "p",
+                );
+
+                tailBlock.appendChild(tail);
+                lastNode.after(tailBlock);
+            }
+
+            if (!hasMeaningfulContent(hostBlock)) {
+                hostBlock.remove();
+            }
+
+            placeCaretAfterInserted(lastNode, selection);
+        } else if (topInline) {
+            const tailRange = document.createRange();
+
+            tailRange.setStart(range.startContainer, range.startOffset);
+            tailRange.setEndAfter(topInline);
+
+            const tail = tailRange.extractContents();
+
+            stripEmptyInlineWrappers(tail);
+            stripEmptyInlineWrappers(topInline);
+
+            topInline.after(fragment);
+
+            if (hasMeaningfulContent(tail)) {
+                lastNode.after(tail);
+            }
+
+            if (!hasMeaningfulContent(topInline)) {
+                topInline.remove();
+            }
+
+            placeCaretAfterInserted(lastNode, selection);
+        } else {
+            range.insertNode(fragment);
+            placeCaretAfterInserted(lastNode, selection);
+        }
+    } else {
+        range.insertNode(fragment);
+        placeCaretAfterInserted(lastNode, selection);
     }
 
     queueSnapshot();
