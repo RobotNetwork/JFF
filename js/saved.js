@@ -177,10 +177,51 @@ savedToggle.addEventListener("click", (event) => {
     setSavedMenuOpen(savedMenu.hidden, event.detail === 0);
 });
 
-/* Tab moves on rather than staying in a menu that no longer has the point. */
+const savedDropdown = savedMenu.closest("#savedDropdown") ?? savedMenu.parentElement;
+
+/* Arrow keys move across saved rows (and Save current); Tab moves freely across controls. */
 savedMenu.addEventListener("keydown", (event) => {
-    if (event.key === "Tab") setSavedMenuOpen(false);
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+
+    const step = event.key === "ArrowDown" ? 1 : -1;
+    const rows = [
+        ...savedList.querySelectorAll(".saved-insert"),
+        ...(savedSaveBtn.disabled ? [] : [savedSaveBtn]),
+    ];
+
+    if (!rows.length) return;
+
+    event.preventDefault();
+
+    const active = document.activeElement;
+    const currentRow =
+        active?.closest?.(".saved-item")?.querySelector(".saved-insert") ??
+        active;
+    const index = rows.indexOf(currentRow);
+    const next =
+        index === -1
+            ? step > 0
+                ? rows[0]
+                : rows[rows.length - 1]
+            : rows[(index + step + rows.length) % rows.length];
+
+    next.focus();
 });
+
+if (savedDropdown) {
+    savedDropdown.addEventListener("focusout", (event) => {
+        if (savedMenu.hidden) return;
+
+        if (
+            event.relatedTarget &&
+            savedDropdown.contains(event.relatedTarget)
+        ) {
+            return;
+        }
+
+        setSavedMenuOpen(false);
+    });
+}
 
 /* A row is a press target, and the press must leave the caret alone. */
 savedList.addEventListener("mousedown", (event) => {

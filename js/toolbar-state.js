@@ -122,6 +122,10 @@ toolbar.addEventListener("keydown", (event) => {
             : controls[controls.length - 1]
         : controls[(index + step + controls.length) % controls.length];
 
+    for (const button of controls) {
+        button.tabIndex = button === next ? 0 : -1;
+    }
+
     next.focus();
 });
 
@@ -190,14 +194,24 @@ headingMenu.addEventListener("keydown", (event) => {
 
     const step =
         event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
+    const edge =
+        event.key === "Home"
+            ? "first"
+            : event.key === "End"
+              ? "last"
+              : "";
 
-    if (!step) return;
+    if (!step && !edge) return;
 
     event.preventDefault();
 
     const items = [...headingMenu.querySelectorAll("button[data-val]")];
     const index = items.indexOf(document.activeElement);
-    const next = items[(index + step + items.length) % items.length];
+    const next = edge
+        ? edge === "first"
+            ? items[0]
+            : items[items.length - 1]
+        : items[(index + step + items.length) % items.length];
 
     next.focus();
 });
@@ -227,12 +241,16 @@ document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
 
     if (!savedMenu.hidden) {
+        const focusInside = savedMenu.contains(document.activeElement);
+
         setSavedMenuOpen(false);
-        savedToggle.focus();
+        if (focusInside) savedToggle.focus();
     }
 
     if (!headingMenu.hidden) {
+        const focusInside = headingMenu.contains(document.activeElement);
+
         closeHeadingMenu();
-        headingToggle.focus();
+        if (focusInside) headingToggle.focus();
     }
 });
