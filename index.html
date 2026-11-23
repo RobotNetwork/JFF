@@ -438,10 +438,10 @@
         <dialog
             id="previewDialog"
             class="preview-dialog"
-            aria-label="Work notes"
+            aria-label="Work notes preview"
         >
             <div class="preview-box">
-                <div class="mirror-body" id="mirrorBody">
+                <div class="mirror-body" id="mirrorBody" tabindex="0">
                     <div class="journal-entry">
                         <div class="journal-head">
                             <span
@@ -464,6 +464,14 @@
                                     id="journalTime"
                                 ></time>
                             </span>
+                            <button
+                                type="button"
+                                id="previewClose"
+                                class="preview-close"
+                                aria-label="Close preview"
+                            >
+                                ×
+                            </button>
                         </div>
 
                         <div
@@ -852,6 +860,9 @@
             <div class="tutorial-box">
                 <header class="tutorial-head">
                     <p class="tutorial-kicker">How it works</p>
+                    <span class="tutorial-counter" id="tutorialCounter"
+                        >1 / 2</span
+                    >
 
                     <button
                         type="button"
@@ -865,7 +876,7 @@
 
                 <div class="tutorial-body" id="tutorialBody">
                     <section class="tutorial-step" data-step="0">
-                        <h3>What this tool does</h3>
+                        <h2>What this tool does</h2>
 
                         <p>
                             ServiceNow shows Work notes and Additional Comments
@@ -879,15 +890,15 @@
                             <img
                                 class="tutorial-shot-dark"
                                 src="assets/tutorial/editor-dark.png"
-                                width="813"
-                                height="440"
+                                width="800"
+                                height="409"
                                 alt="The editor card with a formatted entry and the formatting toolbar above it."
                             />
                             <img
                                 class="tutorial-shot-light"
                                 src="assets/tutorial/editor-light.png"
-                                width="813"
-                                height="440"
+                                width="800"
+                                height="409"
                                 alt="The editor card with a formatted entry and the formatting toolbar above it."
                             />
                             <figcaption>
@@ -899,7 +910,7 @@
                     </section>
 
                     <section class="tutorial-step" data-step="1" hidden>
-                        <h3>What lands on the clipboard</h3>
+                        <h2>What lands on the clipboard</h2>
 
                         <p>
                             Copy [formatted] (Ctrl+Alt+C) puts plain text on

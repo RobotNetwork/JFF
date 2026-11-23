@@ -60,6 +60,9 @@ function showTutorialStep(index) {
     tutorialBack.hidden = tutorialIndex === 0;
     tutorialNext.textContent =
         tutorialIndex === tutorialSteps.length - 1 ? "Done" : "Next";
+    if (tutorialCounter) {
+        tutorialCounter.textContent = `${tutorialIndex + 1} / ${tutorialSteps.length}`;
+    }
     tutorialBody.scrollTop = 0;
 }
 
@@ -81,6 +84,7 @@ function openTutorial() {
  * the Settings button that launched it.
  */
 let focusEditorAfterClose = false;
+let openedTutorialFromSettings = false;
 
 function maybeShowTutorial() {
     if (tutorialIsHidden()) return;
@@ -90,7 +94,13 @@ function maybeShowTutorial() {
 }
 
 tutorialDialog.addEventListener("close", () => {
-    if (focusEditorAfterClose && matchMedia("(min-width: 801px)").matches) {
+    if (openedTutorialFromSettings) {
+        openedTutorialFromSettings = false;
+        settingsBtn.focus();
+    } else if (
+        focusEditorAfterClose &&
+        matchMedia("(min-width: 801px)").matches
+    ) {
         editor.focus();
     }
 
@@ -139,6 +149,8 @@ tutorialStartInput.addEventListener("change", () => {
 });
 
 tutorialOpenBtn.addEventListener("click", () => {
+    openedTutorialFromSettings = true;
+
     if (settingsDialog.open) settingsDialog.close();
 
     openTutorial();

@@ -855,8 +855,9 @@ main {
 
 .journal-head {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 10px;
+    gap: 6px 10px;
     margin-bottom: 12px;
 }
 
@@ -887,6 +888,30 @@ main {
     white-space: nowrap;
     font-size: 14px;
     color: rgb(76, 86, 92);
+}
+
+.preview-close {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: rgb(76, 86, 92);
+    font-family: inherit;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.preview-close:hover {
+    border-color: rgb(180, 187, 192);
+    background: rgb(240, 242, 245);
+    color: rgb(16, 23, 26);
 }
 
 /* ---------- Saved messages ---------- */
@@ -1064,7 +1089,7 @@ main {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    width: 22rem;
+    width: min(22rem, calc(100vw - 32px));
     max-width: 100%;
     padding: 16px;
     border: 1px solid var(--border-strong);
@@ -1298,10 +1323,13 @@ main {
 /* Two columns, wider than the single-field dialogs: the section list on the
    left, the setting beside it on the right. */
 .settings-form {
-    width: 34rem;
+    width: min(34rem, calc(100vw - 32px));
+    max-height: calc(100dvh - 32px);
 }
 
 .settings-body {
+    flex: 1 1 auto;
+    min-height: 0;
     display: flex;
     gap: 12px;
 }
@@ -1348,6 +1376,7 @@ main {
     flex: 1;
     min-width: 0;
     min-height: 10rem;
+    overflow-y: auto;
     padding-left: 12px;
 }
 
@@ -1509,6 +1538,12 @@ main {
     text-transform: uppercase;
 }
 
+.tutorial-counter {
+    color: var(--muted);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
 .tutorial-close {
     flex: none;
     margin-left: auto;
@@ -1551,7 +1586,7 @@ main {
     display: none;
 }
 
-.tutorial-step h3 {
+.tutorial-step h2 {
     margin: 0;
     font-size: 17px;
 }
@@ -1642,6 +1677,28 @@ main {
 }
 
 @media (max-width: 640px) {
+    .settings-body {
+        flex-direction: column;
+    }
+
+    .settings-nav {
+        flex-direction: row;
+        flex-wrap: wrap;
+        width: 100%;
+        padding-right: 0;
+        padding-bottom: 8px;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .settings-nav-item {
+        width: auto;
+    }
+
+    .settings-panels {
+        padding-left: 0;
+    }
+
     .tutorial-foot {
         flex-wrap: wrap;
     }

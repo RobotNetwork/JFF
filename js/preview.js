@@ -48,6 +48,10 @@ function openPreviewDialog() {
 
 previewBtn.addEventListener("click", openPreviewDialog);
 
+previewClose.addEventListener("click", () => {
+    previewDialog.close();
+});
+
 closeOnBackdrop(previewDialog, () => {
     previewDialog.close();
 });

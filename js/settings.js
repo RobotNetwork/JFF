@@ -35,6 +35,10 @@ function openSettingsDialog() {
 function openSettingsDialogAt(name) {
     showSettingsPanel(name);
     openSettingsDialog();
+
+    const active = settingsNav.querySelector(`[data-panel="${name}"]`);
+
+    if (active) active.focus();
 }
 
 settingsBtn.addEventListener("click", openSettingsDialog);
