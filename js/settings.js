@@ -57,40 +57,9 @@ closeOnBackdrop(settingsDialog, () => settingsDialog.close());
 
 /* ---------- Accent colour ---------- */
 
-const defaultAccent = "#1a7f37";
-
-/* The wheel and the store both speak a six-digit hex colour, nothing else. */
-function validAccent(value) {
-    return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
-}
-
-/*
- * The ink sits on an accent fill (a primary dialog button, the pressed
- * toolbar state), so it is derived rather than chosen: black or white,
- * whichever clears WCAG by more against the accent's relative luminance.
- */
-function accentInk(hex) {
-    const value = hex.slice(1);
-
-    const linear = (start) => {
-        const c = parseInt(value.slice(start, start + 2), 16) / 255;
-
-        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-    };
-
-    const luminance =
-        0.2126 * linear(0) + 0.7152 * linear(2) + 0.0722 * linear(4);
-
-    const againstBlack = (luminance + 0.05) / 0.05;
-    const againstWhite = 1.05 / (luminance + 0.05);
-
-    return againstBlack >= againstWhite ? "#111" : "#fff";
-}
-
 /* Inline on the root, so it outranks both the dark and light palettes. */
 function applyAccent(hex) {
-    document.documentElement.style.setProperty("--accent", hex);
-    document.documentElement.style.setProperty("--accent-ink", accentInk(hex));
+    applyAccentRoot(hex);
     accentInput.value = hex;
 }
 

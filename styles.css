@@ -6,6 +6,7 @@
     --border-strong: #7a818c;
     --text: #e4e7eb;
     --accent: #1a7f37;
+    --accent-rgb: 26, 127, 55;
     /* Text and glyphs on an accent fill. */
     --accent-ink: #fff;
     /*
@@ -20,6 +21,7 @@
     --code-bg: #14161a;
     /* A copy failure and a rejected link URL. */
     --danger: #ff7b72;
+    --danger-rgb: 255, 123, 114;
     --muted: #9aa1ab;
     --mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
 }
@@ -49,6 +51,7 @@
     --accent-text: color-mix(in srgb, var(--accent) 55%, var(--text));
     --code-bg: #f0f2f5;
     --danger: #b3261e;
+    --danger-rgb: 179, 38, 30;
     --muted: #5b636d;
 }
 
@@ -311,13 +314,13 @@ main {
     border-color: var(--accent);
     /* The accent at a lower alpha, taken from the accent itself so a colour
        change reaches the pressed states too. */
-    background: rgb(from var(--accent) r g b / 0.18);
+    background: rgba(var(--accent-rgb), 0.18);
     color: var(--accent-text);
     box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 .toolbar button[aria-pressed="true"]:hover {
-    background: rgb(from var(--accent) r g b / 0.25);
+    background: rgba(var(--accent-rgb), 0.25);
 }
 
 /* Icon-like toolbar buttons centre their glyphs on both axes rather than
@@ -453,7 +456,7 @@ main {
 
 .dropdown-menu button[aria-checked="true"] {
     border-color: var(--accent);
-    background: rgb(from var(--accent) r g b / 0.18);
+    background: rgba(var(--accent-rgb), 0.18);
     color: var(--accent-text);
 }
 
@@ -510,7 +513,7 @@ main {
 }
 
 .resize-handle:hover {
-    background: rgb(from var(--accent) r g b / 0.1);
+    background: rgba(var(--accent-rgb), 0.1);
 }
 
 #editor {
@@ -574,7 +577,7 @@ main {
 }
 
 #editor:focus {
-    background: rgb(from var(--accent) r g b / 0.02);
+    background: rgba(var(--accent-rgb), 0.02);
     outline: 1px solid var(--accent);
     outline-offset: -1px;
 }
@@ -669,7 +672,7 @@ main {
 .editor-actions > .dropdown > .dropdown-toggle:hover {
     box-shadow:
         0 0 0 1px var(--accent),
-        0 0 12px 1px rgb(from var(--accent) r g b / 0.55);
+        0 0 12px 1px rgba(var(--accent-rgb), 0.55);
 }
 
 /* Copy is out while the entry is empty; it keeps the row's metrics. */
@@ -984,7 +987,7 @@ main {
 
 .saved-item button:hover {
     border-color: transparent;
-    background: rgb(from var(--accent) r g b / 0.18);
+    background: rgba(var(--accent-rgb), 0.18);
     color: var(--accent-text);
 }
 
@@ -1021,7 +1024,7 @@ main {
 
 .saved-delete:hover {
     border-color: var(--danger);
-    background: rgb(from var(--danger) r g b / 0.12);
+    background: rgba(var(--danger-rgb), 0.12);
     color: var(--danger);
 }
 
@@ -1218,7 +1221,7 @@ main {
 
 .dialog-actions .danger:hover {
     border-color: var(--danger);
-    background: rgb(from var(--danger) r g b / 0.12);
+    background: rgba(var(--danger-rgb), 0.12);
     color: var(--danger);
 }
 
@@ -1361,14 +1364,14 @@ main {
 }
 
 .settings-nav-item:hover {
-    background: rgb(from var(--accent) r g b / 0.18);
+    background: rgba(var(--accent-rgb), 0.18);
     color: var(--accent-text);
 }
 
 /* The current section reads as pressed, like a toolbar button in use. */
 .settings-nav-item[aria-current="true"] {
     border-color: var(--accent);
-    background: rgb(from var(--accent) r g b / 0.18);
+    background: rgba(var(--accent-rgb), 0.18);
     color: var(--accent-text);
 }
 
