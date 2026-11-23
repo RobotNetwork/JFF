@@ -17,17 +17,22 @@ function escapeAttr(value) {
 
 /*
  * A line that carries code rather than prose: punctuation that only appears
- * in code, a language keyword, a call, an assignment, or indentation.
+ * in code, a statement-leading language keyword, uppercase SQL clauses, a
+ * call, an assignment, or non-list indentation.
  */
 const codeShapes = [
     /[;{}]|=>|==|!=|:=|<=|>=/,
-    /\b(?:def|function|class|return|import|from|const|let|var|public|private|protected|static|void|int|float|double|bool|string|true|false|null|nil|print|printf|echo|console|require|await|async|SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|JOIN|GROUP|ORDER)\b/i,
+    /^\s*(?:def|function|class|return|import|const|let|var|public|private|protected|static|async|await|export|package|using)\b/,
+    /^\s*from\s+[\w.]+\s+import\b/,
+    /^\s*(?:SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|FROM|WHERE|JOIN|INNER\s+JOIN|LEFT\s+JOIN|GROUP\s+BY|ORDER\s+BY|HAVING|LIMIT)\b/,
+    /\b(?:console|printf|require)\s*\(/,
     /[A-Za-z_$][\w$]*\s*\(/,
     /\w\s*[=<>!]=?\s*\S/,
-    /^\s+\S/,
+    /^\s+(?![-*+]\s|\d+[.)]\s)\S/,
 ];
 
 const codeComments = /^\s*(?:#|\/\/|--|;|%)/;
+const markdownListOrQuote = /^\s*(?:[-*+]\s+|\d+[.)]\s+|>\s)/;
 
 /*
  * A plain-text paste that is really a code sample should not be run through
@@ -45,6 +50,8 @@ function looksLikeCode(text) {
 
     for (const line of lines) {
         if (codeComments.test(line)) continue;
+
+        if (markdownListOrQuote.test(line)) return false;
 
         if (!codeShapes.some((pattern) => pattern.test(line))) {
             return false;

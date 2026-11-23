@@ -7,14 +7,44 @@
 function markdownToHtml(markdown) {
     const lines = markdown.split(/\r?\n/);
     const result = [];
-    let list = null;
+    const listStack = [];
+    let quoteLines = null;
     let fence = null;
+    let lastType = null;
+    let pendingBlank = false;
 
-    const closeList = () => {
-        if (!list) return;
+    const closeListsTo = (targetIndent, tag) => {
+        while (listStack.length > 0) {
+            const top = listStack[listStack.length - 1];
 
-        result.push(`</${list}>`);
-        list = null;
+            if (
+                top.indent > targetIndent ||
+                (top.indent === targetIndent && top.tag !== tag)
+            ) {
+                if (top.hasItem) result.push("</li>");
+                result.push(`</${top.tag}>`);
+                listStack.pop();
+            } else {
+                break;
+            }
+        }
+    };
+
+    const closeAllLists = () => {
+        while (listStack.length > 0) {
+            const top = listStack.pop();
+
+            if (top.hasItem) result.push("</li>");
+            result.push(`</${top.tag}>`);
+        }
+    };
+
+    const closeQuote = () => {
+        if (!quoteLines) return;
+
+        result.push(`<blockquote>${quoteLines.join("<br>")}</blockquote>`);
+        quoteLines = null;
+        lastType = "blockquote";
     };
 
     const closeFence = () => {
@@ -23,6 +53,7 @@ function markdownToHtml(markdown) {
         );
 
         fence = null;
+        lastType = "pre";
     };
 
     const inline = (text) => {
@@ -30,14 +61,27 @@ function markdownToHtml(markdown) {
 
         const hold = (html) => `\u0000${tokens.push(html) - 1}\u0000`;
 
+        const expandTokens = (value) => {
+            let current = value;
+
+            for (let pass = 0; pass < 4 && /\u0000\d+\u0000/.test(current); pass++) {
+                current = current.replace(
+                    /\u0000(\d+)\u0000/g,
+                    (match, index) => tokens[Number(index)] ?? match,
+                );
+            }
+
+            return current;
+        };
+
         /*
          * Code spans and links are held as placeholders so the emphasis
          * passes cannot rewrite text inside them, and so link URLs are
          * escaped exactly once. Emphasis delimiters are anchored to word
          * boundaries so that prose containing bare asterisks survives. NUL
          * is the placeholder delimiter, so any that arrived in the text is
-         * removed before tokenizing, and an index that does not resolve
-         * falls back to the literal match rather than to undefined.
+         * removed before tokenizing, and nested placeholders (such as a code
+         * span inside a link label) are expanded iteratively.
          */
         const held = text
             .replace(/\u0000/g, "")
@@ -61,7 +105,11 @@ function markdownToHtml(markdown) {
                 },
             );
 
-        return escapeHtml(held)
+        const formatted = escapeHtml(held)
+            .replace(
+                /(^|[^*\w])\*\*\*(?!\s)((?:[^*]|\*(?!\*\*))+?)(?<!\s)\*\*\*(?![\w*])/g,
+                "$1<b><em>$2</em></b>",
+            )
             .replace(
                 /(^|[^*\w])\*\*(?!\s)((?:[^*]|\*(?!\*))+?)(?<!\s)\*\*(?![\w*])/g,
                 "$1<b>$2</b>",
@@ -70,11 +118,45 @@ function markdownToHtml(markdown) {
                 /(^|[^*\w])\*(?!\s)([^*\n]+?)(?<!\s)\*(?![\w*])/g,
                 "$1<em>$2</em>",
             )
-            .replace(/~~([^~]+)~~/g, "<strike>$1</strike>")
-            .replace(
-                /\u0000(\d+)\u0000/g,
-                (match, index) => tokens[Number(index)] ?? match,
-            );
+            .replace(/~~([^~]+)~~/g, "<strike>$1</strike>");
+
+        return expandTokens(formatted);
+    };
+
+    const pushListItem = (tag, rawIndent, content) => {
+        closeQuote();
+        pendingBlank = false;
+
+        const indent = rawIndent.replace(/\t/g, "  ").length;
+
+        if (listStack.length === 0) {
+            result.push(`<${tag}>`);
+            listStack.push({ tag, indent, hasItem: false });
+        } else {
+            const top = listStack[listStack.length - 1];
+
+            if (indent > top.indent) {
+                result.push(`<${tag}>`);
+                listStack.push({ tag, indent, hasItem: false });
+            } else {
+                closeListsTo(indent, tag);
+
+                if (
+                    listStack.length === 0 ||
+                    listStack[listStack.length - 1].indent < indent
+                ) {
+                    result.push(`<${tag}>`);
+                    listStack.push({ tag, indent, hasItem: false });
+                }
+            }
+        }
+
+        const current = listStack[listStack.length - 1];
+
+        if (current.hasItem) result.push("</li>");
+        result.push(`<li>${inline(content)}`);
+        current.hasItem = true;
+        lastType = "list";
     };
 
     for (const line of lines) {
@@ -96,51 +178,56 @@ function markdownToHtml(markdown) {
         }
 
         if (/^\s*```[\w-]*\s*$/.test(line)) {
-            closeList();
+            closeAllLists();
+            closeQuote();
+            pendingBlank = false;
             fence = [];
         } else if ((match = line.match(headingHashPattern))) {
             /*
              * ServiceNow renders each heading level as written, so the hash
              * count maps straight to the tag rather than collapsing to h3.
              */
-            closeList();
+            closeAllLists();
+            closeQuote();
+            pendingBlank = false;
 
             const level = match[1].length;
 
             result.push(`<h${level}>${inline(match[2])}</h${level}>`);
+            lastType = "heading";
         } else if ((match = line.match(/^>\s?(.*)$/))) {
-            closeList();
-            result.push(
-                `<blockquote>${inline(match[1])}</blockquote>`,
-            );
-        } else if ((match = line.match(/^[-*+]\s+(.*)$/))) {
-            if (list !== "ul") {
-                closeList();
-                result.push("<ul>");
-                list = "ul";
-            }
+            closeAllLists();
+            pendingBlank = false;
 
-            result.push(`<li>${inline(match[1])}</li>`);
-        } else if ((match = line.match(/^\d+[.)]\s+(.*)$/))) {
-            if (list !== "ol") {
-                closeList();
-                result.push("<ol>");
-                list = "ol";
-            }
-
-            result.push(`<li>${inline(match[1])}</li>`);
+            if (!quoteLines) quoteLines = [];
+            quoteLines.push(inline(match[1]));
+        } else if ((match = line.match(/^([ \t]*)[-*+]\s+(.*)$/))) {
+            pushListItem("ul", match[1], match[2]);
+        } else if ((match = line.match(/^([ \t]*)\d+[.)]\s+(.*)$/))) {
+            pushListItem("ol", match[1], match[2]);
         } else if (line.trim() === "") {
-            closeList();
-            result.push("");
+            closeAllLists();
+            closeQuote();
+
+            if (result.length > 0) pendingBlank = true;
         } else {
-            closeList();
+            closeAllLists();
+            closeQuote();
+
+            if (pendingBlank && lastType === "p") {
+                result.push("<p><br></p>");
+            }
+
+            pendingBlank = false;
             result.push(`<p>${inline(line)}</p>`);
+            lastType = "p";
         }
     }
 
     if (fence) closeFence();
 
-    closeList();
+    closeAllLists();
+    closeQuote();
 
     return result.join("");
 }
