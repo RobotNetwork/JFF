@@ -60,6 +60,15 @@
     box-sizing: border-box;
 }
 
+button:focus-visible,
+summary:focus-visible,
+a:focus-visible,
+input:focus-visible,
+[tabindex]:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 2px;
+}
+
 /*
  * The chrome is not text to read or copy: the page header and its subtext,
  * the formatting toolbar, the action row under the field and the menus they
@@ -256,7 +265,7 @@ main {
     gap: 4px;
     padding: 8px 12px;
     border-bottom: 1px solid var(--border);
-    border-radius: inherit;
+    border-radius: 7px 7px 0 0;
     background: var(--panel);
 }
 
@@ -1062,12 +1071,14 @@ main {
     font-size: 15px;
 }
 
-.link-form label {
+.link-form label,
+.name-form label {
     color: var(--muted);
     font-size: 12px;
 }
 
-.link-form input {
+.link-form input,
+.name-form input {
     padding: 6px 8px;
     border: 1px solid var(--border-strong);
     border-radius: 4px;
@@ -1081,7 +1092,8 @@ main {
  * The border colour alone is what hover does, so focus adds a ring: a
  * keyboard user has to be able to see where the typing will land.
  */
-.link-form input:focus {
+.link-form input:focus,
+.name-form input:focus {
     border-color: var(--accent);
     outline: 2px solid var(--accent);
     outline-offset: 1px;
@@ -1116,6 +1128,16 @@ main {
     color: var(--accent-text);
 }
 
+.dialog-actions button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.dialog-actions button:disabled:hover {
+    border-color: var(--border-strong);
+    color: var(--text);
+}
+
 .dialog-actions .primary {
     border-color: var(--accent);
     background: var(--accent);
@@ -1126,6 +1148,12 @@ main {
 .dialog-actions .primary:hover {
     color: var(--accent-ink);
     filter: brightness(0.92);
+}
+
+.dialog-actions .primary:disabled:hover {
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    filter: none;
 }
 
 /*
