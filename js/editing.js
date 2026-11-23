@@ -320,6 +320,9 @@ editor.addEventListener("keydown", (event) => {
 
                     paragraph.innerHTML = "<br>";
                     pre.after(paragraph);
+
+                    if (isBlankContent(pre)) pre.remove();
+
                     placeCaret(paragraph);
 
                     queueSnapshot();
@@ -965,9 +968,11 @@ function clearBlockFormat(element) {
     if (!isFormattingBlock(element)) return null;
 
     if (element.querySelector(blockSelector)) {
+        const first = element.firstElementChild;
+
         unwrapElement(element);
 
-        return element.firstElementChild;
+        return first;
     }
 
     const paragraph = document.createElement("p");
@@ -1056,9 +1061,14 @@ function clearFormatting() {
      * it partly covers, and kept as nodes rather than as a Range: moving a
      * text node into its new block moves a Range's boundary out of it.
      */
-    const live = window.getSelection().getRangeAt(0);
-    const start = { node: live.startContainer, offset: live.startOffset };
-    const end = { node: live.endContainer, offset: live.endOffset };
+    const liveSelection = window.getSelection();
+    const live = liveSelection.rangeCount ? liveSelection.getRangeAt(0) : null;
+    const start = live
+        ? { node: live.startContainer, offset: live.startOffset }
+        : null;
+    const end = live
+        ? { node: live.endContainer, offset: live.endOffset }
+        : null;
 
     const cleared = lines.map((line) => {
         if (collapsed) {
@@ -1068,7 +1078,7 @@ function clearFormatting() {
         return clearBlockFormat(line) ?? (line.isConnected ? line : null);
     });
 
-    if (restoreSelection(start, end)) return;
+    if (start && end && restoreSelection(start, end)) return;
 
     placeCaretAtEnd(cleared.findLast(Boolean) ?? editor);
 }
