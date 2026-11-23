@@ -96,6 +96,7 @@ function parseStoredEntry(stored) {
 
     sanitizeRichText(doc);
     wrapOrphanListItems(doc.body);
+    doc.body.normalize();
 
     return doc;
 }

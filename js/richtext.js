@@ -539,6 +539,18 @@ function sanitizeRichText(doc) {
             element.setAttribute("spellcheck", "false");
         }
     });
+
+    /*
+     * Empty inline formatting wrappers carry no content and can sit between
+     * adjacent text nodes, splitting prose runs that belong together.
+     */
+    for (const element of [
+        ...doc.body.querySelectorAll(inlineFormatSelector),
+    ].reverse()) {
+        if (!element.firstElementChild && element.textContent === "") {
+            element.remove();
+        }
+    }
 }
 
 /*

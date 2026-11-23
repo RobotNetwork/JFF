@@ -151,6 +151,25 @@ function normalizeCodePunctuation(text) {
     );
 }
 
+function neutralizeProseDelimiters(text) {
+    /*
+     * Outside [code] the journal shows the text as written, so escaping
+     * there would display entities instead of the characters typed. A
+     * delimiter written as literal prose would still mint a live region
+     * downstream, though, so a zero-width space after the bracket breaks it
+     * for the renderer while staying invisible. The zero-width spaces that
+     * hold a caret beside an inline code span are invisible too, and they are
+     * dropped before the delimiters are rewritten. Running this on assembled
+     * prose chunks prevents split text nodes or empty inline elements from
+     * forging a live [code] or [/code] delimiter.
+     */
+    return text
+        .replace(/\u200b/g, "")
+        .replace(typedCodeDelimiter, (delimiter) =>
+            delimiter.replace("[", "[\u200b"),
+        );
+}
+
 function serializeText(node, insideCode) {
     const text = node.textContent.replace(/\u00a0/g, " ");
 
@@ -162,22 +181,7 @@ function serializeText(node, insideCode) {
         return escapeCodeDelimiters(escapeHtml(normalizeCodePunctuation(text)));
     }
 
-    /*
-     * Outside [code] the journal shows the text as written, so escaping
-     * there would display entities instead of the characters typed. A
-     * delimiter written as literal prose would still mint a live region
-     * downstream, though, so a zero-width space after the bracket breaks it
-     * for the renderer while staying invisible. The zero-width spaces that
-     * hold a caret beside an inline code span are invisible too, and they are
-     * dropped before the delimiters are rewritten. This runs in the prose
-     * branch only: the regions the app builds are minted later by wrapCode
-     * and are left untouched.
-     */
-    return text
-        .replace(/\u200b/g, "")
-        .replace(typedCodeDelimiter, (delimiter) =>
-            delimiter.replace("[", "[\u200b"),
-        );
+    return neutralizeProseDelimiters(text);
 }
 
 /*
@@ -454,6 +458,54 @@ function tidyProse(text) {
  * page shows: ServiceNow stores the entry and renders it, so a newline between
  * two blocks is a <br> on screen.
  */
+const mirrorAllowedTags = new Set([
+    "b",
+    "em",
+    "strike",
+    "u",
+    "code",
+    "pre",
+    "blockquote",
+    "a",
+    "ul",
+    "ol",
+    "li",
+    "p",
+    "br",
+    ...headingLevels,
+]);
+
+function sanitizeMirrorFragment(root) {
+    for (const element of [...root.querySelectorAll("*")]) {
+        const tag = element.tagName.toLowerCase();
+
+        if (!mirrorAllowedTags.has(tag)) {
+            element.remove();
+            continue;
+        }
+
+        for (const attribute of [...element.attributes]) {
+            const isAllowedHref =
+                tag === "a" &&
+                attribute.name.toLowerCase() === "href" &&
+                normalizeHref(attribute.value) !== "";
+
+            if (!isAllowedHref) {
+                element.removeAttribute(attribute.name);
+            }
+        }
+
+        if (tag === "a") {
+            if (!element.hasAttribute("href")) {
+                element.replaceWith(...element.childNodes);
+            } else {
+                element.target = "_blank";
+                element.rel = "noopener noreferrer";
+            }
+        }
+    }
+}
+
 function mirrorNodes(body) {
     const fragment = document.createDocumentFragment();
 
@@ -468,11 +520,7 @@ function mirrorNodes(body) {
         const region = document.createElement("template");
 
         region.innerHTML = part.slice(codeOpen.length, -codeClose.length);
-
-        for (const link of region.content.querySelectorAll("a")) {
-            link.target = "_blank";
-            link.rel = "noopener noreferrer";
-        }
+        sanitizeMirrorFragment(region.content);
 
         fragment.append(region.content);
     });
@@ -502,15 +550,116 @@ function renderMirror(body) {
     previewRaw.textContent = body;
 }
 
+function pushProsePart(parts, text) {
+    if (!text) return;
+
+    const last = parts[parts.length - 1];
+
+    if (last && last.type === "prose") {
+        last.text += text;
+    } else {
+        parts.push({ type: "prose", text });
+    }
+}
+
+function partsEndWithNewline(parts) {
+    const last = parts[parts.length - 1];
+
+    return Boolean(last && last.type === "prose" && last.text.endsWith("\n"));
+}
+
+/*
+ * Collects top-level prose and minted [code] chunks separately so adjacent
+ * prose nodes (including ones separated by empty inline elements) are merged
+ * and neutralized as a single string before joining with minted [code] blocks.
+ */
+function collectSerializedParts(node, parts) {
+    if (node.nodeType === Node.TEXT_NODE) {
+        pushProsePart(parts, node.textContent.replace(/\u00a0/g, " "));
+        return;
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+        return;
+    }
+
+    const tag = node.tagName.toLowerCase();
+
+    if (tag === "p" || tag === "div") {
+        const startLen = parts.length;
+        const startTextLen =
+            startLen > 0 && parts[startLen - 1].type === "prose"
+                ? parts[startLen - 1].text.length
+                : 0;
+
+        for (const child of node.childNodes) {
+            collectSerializedParts(child, parts);
+        }
+
+        const addedNothing =
+            parts.length === startLen &&
+            (startLen === 0 ||
+                parts[startLen - 1].type !== "prose" ||
+                parts[startLen - 1].text.length === startTextLen);
+
+        if (addedNothing || !partsEndWithNewline(parts)) {
+            pushProsePart(parts, "\n");
+        }
+
+        return;
+    }
+
+    if (tag === "li") {
+        for (const child of node.childNodes) {
+            collectSerializedParts(child, parts);
+        }
+
+        pushProsePart(parts, "\n");
+        return;
+    }
+
+    if (tag === "br") {
+        pushProsePart(parts, "\n");
+        return;
+    }
+
+    if (inlineTags.has(tag) || blockTags.has(tag)) {
+        const html = serializeHtmlElement(node);
+
+        if (!html) return;
+
+        parts.push({ type: "code", text: wrapCode(html) });
+
+        if (blockTags.has(tag)) {
+            pushProsePart(parts, "\n");
+        }
+
+        return;
+    }
+
+    for (const child of node.childNodes) {
+        collectSerializedParts(child, parts);
+    }
+}
+
 /*
  * What the entry serializes to. Blank lines at either end come from an empty
  * first or last block and are dropped, but the indentation of the first line is
  * not: it is what survives of a pasted snippet's leading whitespace.
  */
 function serializedBody() {
-    return serializeChildren(editor, false)
-        .split(codeRegion)
-        .map((part, index) => (index % 2 ? part : tidyProse(part)))
+    const parts = [];
+
+    for (const child of editor.childNodes) {
+        collectSerializedParts(child, parts);
+    }
+
+    return parts
+        .map((part) =>
+            part.type === "code"
+                ? part.text
+                : tidyProse(neutralizeProseDelimiters(part.text)),
+        )
         .join("")
         .replace(/^[ \t]*\n+/, "")
         .replace(/\n+[ \t]*$/, "")
