@@ -144,25 +144,78 @@ function stepOutOfInlineCode(direction) {
     return { stepped: true, mutated: point.mutated };
 }
 
+function stripEmptyInlineWrappers(root) {
+    for (const element of [
+        ...root.querySelectorAll(inlineFormatSelector),
+    ].reverse()) {
+        if (!element.firstElementChild && element.textContent === "") {
+            element.remove();
+        }
+    }
+}
+
 /*
  * Enter inside inline code would put the break in the span, which [code]
  * cannot hold, and Chrome's own paragraph command copies the span into the
  * block below when it is the last thing in its block. Everything after the
- * span moves into a new block of the same shape instead, so the break lands
+ * span on the current line moves into a new block instead, so the break lands
  * on the far side of it and the span stays whole.
  */
 function splitBlockAfterInlineCode(code) {
     const block = blockOf(code);
     const anchor = block === editor ? editorChild(code) : block;
-    const paragraph = document.createElement(
-        block === editor ? "p" : anchor.tagName.toLowerCase(),
-    );
+    const tailRange = document.createRange();
 
-    while (code.nextSibling) paragraph.appendChild(code.nextSibling);
+    tailRange.setStartAfter(code);
+
+    let trailingBreak = null;
+
+    if (block === editor) {
+        let stop = anchor.nextSibling;
+
+        while (stop) {
+            if (
+                stop.nodeType === Node.ELEMENT_NODE &&
+                (stop.tagName === "BR" ||
+                    blockLevelTags.has(stop.tagName.toLowerCase()))
+            ) {
+                break;
+            }
+            stop = stop.nextSibling;
+        }
+
+        if (stop) {
+            tailRange.setEndBefore(stop);
+            if (stop.nodeType === Node.ELEMENT_NODE && stop.tagName === "BR") {
+                trailingBreak = stop;
+            }
+        } else {
+            tailRange.setEnd(editor, editor.childNodes.length);
+        }
+    } else {
+        tailRange.setEnd(block, block.childNodes.length);
+    }
+
+    const tail = tailRange.extractContents();
+
+    stripEmptyInlineWrappers(tail);
+    if (trailingBreak) trailingBreak.remove();
+
+    const blockTag = block === editor ? "p" : block.tagName.toLowerCase();
+    const nextTag =
+        blockTag === "li" || blockTag === "div" ? blockTag : "p";
+    const paragraph = document.createElement(nextTag);
+
+    paragraph.appendChild(tail);
 
     if (!paragraph.firstChild) paragraph.innerHTML = "<br>";
 
-    anchor.after(paragraph);
+    if (blockTag === "blockquote") {
+        block.appendChild(paragraph);
+    } else {
+        anchor.after(paragraph);
+    }
+
     placeCaret(paragraph);
 }
 

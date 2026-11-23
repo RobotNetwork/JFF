@@ -506,6 +506,40 @@ function lineNodeAt(node, offset, atEnd) {
     return current;
 }
 
+function codeTextOfNodes(nodes) {
+    let text = "";
+
+    for (const node of nodes) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            text += node.data;
+            continue;
+        }
+
+        if (node.nodeType !== Node.ELEMENT_NODE) continue;
+
+        const tag = node.tagName.toLowerCase();
+
+        if (tag === "br") {
+            text += "\n";
+        } else if (
+            tag === "pre" ||
+            tag === "ul" ||
+            tag === "ol" ||
+            codeBreakTags.has(tag)
+        ) {
+            if (text && !text.endsWith("\n")) {
+                text += "\n";
+            }
+
+            text += `${codeText(node).replace(/\n$/, "")}\n`;
+        } else {
+            text += codeText(node);
+        }
+    }
+
+    return text.replace(/^\n+|\n+$/g, "");
+}
+
 /*
  * The nearest container the two line blocks share, then the run of its
  * children the selection crosses.
@@ -546,25 +580,13 @@ function buildCodeBlock(range) {
     );
 
     /*
-     * codeText reads a block's lines, whatever the line structure arrived
-     * as: real blocks, a <br> run, or the newlines a code block already
-     * holds. A piece's own trailing newline is the break the join below
-     * writes anyway, so one goes; blank lines the run starts or ends with
-     * go with the edges.
+     * codeTextOfNodes reads lines from real blocks, <br> runs, or existing
+     * code blocks without doubling newlines on bare <br> elements.
      */
     const pre = document.createElement("pre");
 
     pre.setAttribute("spellcheck", "false");
-
-    pre.textContent = touched
-        .map((node) => {
-            const text =
-                node.nodeType === Node.TEXT_NODE ? node.data : codeText(node);
-
-            return text.replace(/\n$/, "");
-        })
-        .join("\n")
-        .replace(/^\n+|\n+$/g, "");
+    pre.textContent = codeTextOfNodes(touched);
 
     if (parent.tagName === "UL" || parent.tagName === "OL") {
         const firstIndex = Math.min(start, end);
