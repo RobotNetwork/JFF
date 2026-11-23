@@ -54,8 +54,36 @@ const codeClose = `[/${codeTag}]`;
 
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/*
+ * split() keeps the captured [code] regions at odd indices. Only the prose
+ * is tidied, so code keeps its trailing whitespace and blank lines.
+ * Matching is case-insensitive to align with ServiceNow's [code] parser.
+ */
+const codeRegion = new RegExp(
+    `(${escapeRegExp(codeOpen)}[\\s\\S]*?${escapeRegExp(codeClose)})`,
+    "i",
+);
+
+/* A delimiter typed as prose or inside HTML, whole, so it can be neutralized. */
+const typedCodeDelimiter = new RegExp(
+    `${escapeRegExp(codeOpen)}|${escapeRegExp(codeClose)}`,
+    "gi",
+);
+
+/*
+ * Inside [code] ServiceNow renders HTML, so replacing the leading bracket of
+ * any case-insensitive [code] or [/code] delimiter with its numeric entity
+ * prevents it from terminating the outer region while rendering the literal
+ * ASCII bracket in ServiceNow and the preview.
+ */
+function escapeCodeDelimiters(html) {
+    return html.replace(typedCodeDelimiter, (delimiter) =>
+        delimiter.replace("[", "&#91;"),
+    );
+}
+
 function wrapCode(html) {
-    return html ? `${codeOpen}${html}${codeClose}` : "";
+    return html ? `${codeOpen}${escapeCodeDelimiters(html)}${codeClose}` : "";
 }
 
 function normalizeHref(value) {
@@ -112,9 +140,9 @@ function serializeText(node, insideCode) {
     if (insideCode) {
         /*
          * Inside [code] ServiceNow renders HTML, so literal characters must
-         * be escaped.
+         * be escaped and [code]/[/code] delimiters neutralized as entities.
          */
-        return escapeHtml(normalizeCodePunctuation(text));
+        return escapeCodeDelimiters(escapeHtml(normalizeCodePunctuation(text)));
     }
 
     /*
@@ -221,7 +249,7 @@ function serializeHtmlElement(element) {
             codeText(element).replace(/^\n+|\n+$/g, ""),
         );
 
-        return `<pre><code>${escapeHtml(text)}</code></pre>`;
+        return `<pre><code>${escapeCodeDelimiters(escapeHtml(text))}</code></pre>`;
     }
 
     const inner = serializeChildren(element, true);
@@ -266,7 +294,12 @@ function serializeHtmlElement(element) {
 
             if (!href) return inner;
 
-            return `<a href="${escapeAttr(href)}">${inner}</a>`;
+            const safeHref = href.replace(
+                /^(https?:\/\/\[[0-9a-f:.]+\])|[\[\]]/gi,
+                (match, ipv6) => ipv6 || (match === "[" ? "%5B" : "%5D"),
+            );
+
+            return `<a href="${escapeAttr(safeHref)}">${inner}</a>`;
         }
 
         case "ul":
@@ -343,20 +376,6 @@ function serializeNode(node, insideCode = false) {
 
     return serializeChildren(node, false);
 }
-
-/*
- * split() keeps the captured [code] regions at odd indices. Only the prose
- * is tidied, so code keeps its trailing whitespace and blank lines.
- */
-const codeRegion = new RegExp(
-    `(${escapeRegExp(codeOpen)}[\\s\\S]*?${escapeRegExp(codeClose)})`,
-);
-
-/* A delimiter typed as prose, whole, so it can be broken in the middle. */
-const typedCodeDelimiter = new RegExp(
-    `${escapeRegExp(codeOpen)}|${escapeRegExp(codeClose)}`,
-    "gi",
-);
 
 function tidyProse(text) {
     return text
