@@ -266,6 +266,8 @@ const chordKeys = {
     Digit6: "6",
     Digit7: "7",
     Digit8: "8",
+    KeyC: "C",
+    KeyP: "P",
     Backquote: "`",
     Backslash: "\\",
     Period: ">",

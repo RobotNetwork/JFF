@@ -298,7 +298,7 @@ savedSearch.addEventListener("input", () => {
  * still there when the menu is open.
  */
 savedToggle.addEventListener("mousedown", (event) => {
-    event.preventDefault();
+    if (event.button === 0) event.preventDefault();
 });
 
 savedToggle.addEventListener("click", (event) => {
@@ -351,7 +351,10 @@ if (savedDropdown) {
 
 /* A row is a press target, and the press must leave the caret alone. */
 savedList.addEventListener("mousedown", (event) => {
-    if (event.target.closest(".saved-insert, .saved-caret-insert")) {
+    if (
+        event.button === 0 &&
+        event.target.closest(".saved-insert, .saved-caret-insert")
+    ) {
         event.preventDefault();
     }
 });

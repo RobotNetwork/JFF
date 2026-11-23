@@ -10,6 +10,8 @@
  * exists in the toolbar, and the saved menu keeps its own listener.
  */
 function commandPress(event) {
+    if (event.button !== 0) return;
+
     /*
      * A press on a control can clear a caret the browser has nowhere to paint
      * before this handler runs. When the editor still holds focus, the caret
@@ -35,7 +37,7 @@ function commandPress(event) {
 
     const button = event.target.closest("button[data-cmd]");
 
-    if (!button) return;
+    if (!button || button.disabled) return;
 
     /*
      * Keeping the default would move focus out of the editor and collapse
