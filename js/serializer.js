@@ -170,15 +170,22 @@ function neutralizeProseDelimiters(text) {
         );
 }
 
-function serializeText(node, insideCode) {
+function serializeText(node, insideCode, inCodeElement = false) {
     const text = node.textContent.replace(/\u00a0/g, " ");
 
     if (insideCode) {
         /*
          * Inside [code] ServiceNow renders HTML, so literal characters must
          * be escaped and [code]/[/code] delimiters neutralized as entities.
+         * Typographic punctuation normalization (curly quotes, dashes, zero-
+         * width characters) is scoped to actual <code>/<pre> elements so
+         * formatted prose and ZWJ emojis survive intact.
          */
-        return escapeCodeDelimiters(escapeHtml(normalizeCodePunctuation(text)));
+        const clean = inCodeElement
+            ? normalizeCodePunctuation(text)
+            : text.replace(/\u200b/g, "");
+
+        return escapeCodeDelimiters(escapeHtml(clean));
     }
 
     return neutralizeProseDelimiters(text);
@@ -202,12 +209,12 @@ function isParagraphBlock(node) {
  * rather than by a newline. Outside [code] the newline each block appends is
  * the break, and no separator is inserted.
  */
-function serializeChildren(node, insideCode) {
+function serializeChildren(node, insideCode, inCodeElement = false) {
     let html = "";
     let previous = null;
 
     for (const child of node.childNodes) {
-        const part = serializeNode(child, insideCode);
+        const part = serializeNode(child, insideCode, inCodeElement);
 
         if (
             insideCode &&
@@ -288,7 +295,7 @@ function isSentinelBr(node) {
     return true;
 }
 
-function serializeHtmlElement(element) {
+function serializeHtmlElement(element, inCodeElement = false) {
     const tag = element.tagName.toLowerCase();
 
     if (tag === "pre") {
@@ -305,7 +312,11 @@ function serializeHtmlElement(element) {
         return `<pre><code>${escapeCodeDelimiters(escapeHtml(text))}</code></pre>`;
     }
 
-    const inner = serializeChildren(element, true);
+    const inner = serializeChildren(
+        element,
+        true,
+        inCodeElement || tag === "code",
+    );
 
     /*
      * ServiceNow keeps the level it is given, so an h1 stays an h1 instead of
@@ -385,9 +396,9 @@ function serializeHtmlElement(element) {
     }
 }
 
-function serializeNode(node, insideCode = false) {
+function serializeNode(node, insideCode = false, inCodeElement = false) {
     if (node.nodeType === Node.TEXT_NODE) {
-        return serializeText(node, insideCode);
+        return serializeText(node, insideCode, inCodeElement);
     }
 
     if (node.nodeType !== Node.ELEMENT_NODE) {
@@ -397,7 +408,7 @@ function serializeNode(node, insideCode = false) {
     const tag = node.tagName.toLowerCase();
 
     if (insideCode) {
-        return serializeHtmlElement(node);
+        return serializeHtmlElement(node, inCodeElement);
     }
 
     if (tag === "p" || tag === "div") {
