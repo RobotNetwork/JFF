@@ -404,6 +404,46 @@ function removeComments(root) {
     }
 }
 
+/*
+ * HTML tables from Excel, Word, Confluence, and ServiceNow are not supported
+ * as table markup in journal entries. Convert each row into a paragraph with
+ * tab-separated cells before the sanitizer unwraps the table elements so cell
+ * contents are not smashed together into one unbroken string.
+ */
+function flattenTables(root) {
+    const doc = root.ownerDocument;
+    const rows = [...root.querySelectorAll("tr")].reverse();
+
+    for (const row of rows) {
+        const cells = [...row.children].filter(
+            (child) => child.tagName === "TD" || child.tagName === "TH",
+        );
+
+        if (cells.length === 0) continue;
+
+        const paragraph = doc.createElement("p");
+
+        cells.forEach((cell, index) => {
+            if (index > 0) {
+                paragraph.appendChild(doc.createTextNode("\t"));
+            }
+
+            for (const block of [...cell.querySelectorAll("p, div")]) {
+                if (block.nextSibling) {
+                    block.after(doc.createTextNode(" "));
+                }
+                unwrapElement(block);
+            }
+
+            while (cell.firstChild) {
+                paragraph.appendChild(cell.firstChild);
+            }
+        });
+
+        row.replaceWith(paragraph);
+    }
+}
+
 function sanitizeRichText(doc) {
     const allowed = [
         "b",
@@ -433,6 +473,8 @@ function sanitizeRichText(doc) {
     doc.body
         .querySelectorAll([...droppedTags].join(","))
         .forEach((element) => element.remove());
+
+    flattenTables(doc.body);
 
     /*
      * Scope sanitization to the body. Unwrapping document root elements

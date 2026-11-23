@@ -160,6 +160,51 @@ function reportDropped(media, files) {
     showNotice(`${parts.join(" and ")} dropped: entries hold text only.`);
 }
 
+function isSelectionInPre() {
+    const selection = window.getSelection();
+
+    if (!selection.rangeCount) return false;
+
+    const range = selection.getRangeAt(0);
+
+    if (
+        !editor.contains(range.startContainer) ||
+        !editor.contains(range.endContainer)
+    ) {
+        return false;
+    }
+
+    const startPre = closestElement(range.startContainer)?.closest("pre");
+    const endPre = closestElement(range.endContainer)?.closest("pre");
+
+    return Boolean(startPre && startPre === endPre && editor.contains(startPre));
+}
+
+function insertPlainTextInPre(text) {
+    const selection = window.getSelection();
+
+    if (!selection.rangeCount) return;
+
+    const range = selection.getRangeAt(0);
+
+    if (!editor.contains(range.commonAncestorContainer)) return;
+
+    range.deleteContents();
+
+    const textNode = document.createTextNode(text.replace(/\r\n?/g, "\n"));
+
+    range.insertNode(textNode);
+    range.setStart(textNode, textNode.data.length);
+    range.collapse(true);
+
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    queueSnapshot();
+    render();
+    updateToolbarState();
+}
+
 /*
  * One path for both ways content arrives, because a drop carries the same
  * DataTransfer a paste does. A drop used to reach the editor with no
@@ -167,6 +212,35 @@ function reportDropped(media, files) {
  * the editor then showed formatting the output could never carry.
  */
 function insertClipboard(dataTransfer) {
+    if (isSelectionInPre()) {
+        const text = dataTransfer.getData("text/plain");
+
+        if (text) {
+            insertPlainTextInPre(text);
+            return;
+        }
+
+        const html = dataTransfer.getData("text/html");
+
+        if (html) {
+            const doc = new DOMParser().parseFromString(html, "text/html");
+            const dropped = doc.body.querySelectorAll(droppedMediaSelector).length;
+            const plain = doc.body.textContent || "";
+
+            if (plain) {
+                insertPlainTextInPre(plain);
+                reportDropped(dropped, 0);
+                return;
+            }
+
+            reportDropped(dropped, dataTransfer.files ? dataTransfer.files.length : 0);
+            return;
+        }
+
+        reportDropped(0, dataTransfer.files ? dataTransfer.files.length : 0);
+        return;
+    }
+
     const html = dataTransfer.getData("text/html");
     let dropped = 0;
 
@@ -212,6 +286,7 @@ editor.addEventListener("paste", (event) => {
     if (
         range &&
         !selection.isCollapsed &&
+        !isSelectionInPre() &&
         editor.contains(range.startContainer) &&
         editor.contains(range.endContainer)
     ) {
@@ -299,6 +374,7 @@ editor.addEventListener("drop", (event) => {
 
     event.preventDefault();
     flushSnapshot();
+    editor.focus();
 
     const point = rangeFromPoint(event);
 
@@ -307,6 +383,8 @@ editor.addEventListener("drop", (event) => {
 
         selection.removeAllRanges();
         selection.addRange(point);
+    } else {
+        placeCaretAtEnd(editor);
     }
 
     insertClipboard(event.dataTransfer);
