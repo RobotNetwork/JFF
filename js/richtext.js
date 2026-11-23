@@ -459,6 +459,10 @@ function sanitizeRichText(doc) {
                 element.removeAttribute(attribute.name);
             }
         }
+
+        if (element.tagName === "CODE" || element.tagName === "PRE") {
+            element.setAttribute("spellcheck", "false");
+        }
     });
 }
 

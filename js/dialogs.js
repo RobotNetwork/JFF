@@ -39,6 +39,18 @@ function closeOnBackdrop(dialog, close) {
     });
 }
 
+function setLinkErrorVisible(visible) {
+    linkError.hidden = !visible;
+
+    if (visible) {
+        linkUrl.setAttribute("aria-invalid", "true");
+        linkUrl.setAttribute("aria-describedby", "linkError");
+    } else {
+        linkUrl.removeAttribute("aria-invalid");
+        linkUrl.removeAttribute("aria-describedby");
+    }
+}
+
 function openLinkDialog(range, anchor) {
     const href = anchor ? normalizeHref(anchor.getAttribute("href") || "") : "";
 
@@ -51,12 +63,14 @@ function openLinkDialog(range, anchor) {
         text: "",
     };
 
-    linkError.hidden = true;
+    setLinkErrorVisible(false);
+    linkDialogTitle.textContent = anchor ? "Edit link" : "Insert link";
+    linkSubmit.textContent = anchor ? "Save" : "Insert";
     linkUrl.value = href;
-    linkText.value = "";
+    linkText.value = anchor ? anchor.textContent : "";
 
-    /* An existing selection already supplies the link text. */
-    linkTextRow.hidden = !range.collapsed;
+    /* An existing selection already supplies the link text unless editing a link. */
+    linkTextRow.hidden = !anchor && !range.collapsed;
 
     /* There is only something to remove when a link was run on. */
     linkRemove.hidden = !anchor;
@@ -93,6 +107,10 @@ function closeLinkDialog() {
     if (linkDialog.open) linkDialog.close();
 }
 
+linkUrl.addEventListener("input", () => {
+    if (!linkError.hidden) setLinkErrorVisible(false);
+});
+
 linkForm.addEventListener("submit", (event) => {
     event.preventDefault();
 
@@ -101,7 +119,7 @@ linkForm.addEventListener("submit", (event) => {
     const href = normalizeHref(linkUrl.value);
 
     if (!href) {
-        linkError.hidden = false;
+        setLinkErrorVisible(true);
         linkUrl.focus();
         return;
     }
@@ -138,7 +156,7 @@ linkDialog.addEventListener("close", () => {
     const pending = pendingLink;
 
     pendingLink = null;
-    linkError.hidden = true;
+    setLinkErrorVisible(false);
 
     if (!pending) return;
 
@@ -163,6 +181,13 @@ linkDialog.addEventListener("close", () => {
      */
     if (pending.editing) {
         pending.editing.setAttribute("href", pending.href);
+
+        if (
+            pending.text !== "" &&
+            pending.text !== pending.editing.textContent
+        ) {
+            pending.editing.textContent = pending.text;
+        }
 
         queueSnapshot();
         render();

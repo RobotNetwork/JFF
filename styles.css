@@ -43,7 +43,7 @@
     --bg: #f6f7f9;
     --panel: #ffffff;
     --border: #dcdfe4;
-    --border-strong: #9aa1ab;
+    --border-strong: #858d97;
     --text: #1c1f24;
     /* Resolved here so the mix uses this palette's text, not the root's. */
     --accent-text: color-mix(in srgb, var(--accent) 55%, var(--text));
@@ -799,7 +799,7 @@ main {
  */
 .mirror-field.is-empty::before {
     content: attr(data-empty);
-    color: rgb(140, 145, 152);
+    color: #6c737c;
 }
 
 /*

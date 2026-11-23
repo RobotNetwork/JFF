@@ -19,7 +19,7 @@ function markdownToHtml(markdown) {
 
     const closeFence = () => {
         result.push(
-            `<pre><code>${escapeHtml(fence.join("\n"))}</code></pre>`,
+            `<pre spellcheck="false"><code spellcheck="false">${escapeHtml(fence.join("\n"))}</code></pre>`,
         );
 
         fence = null;
@@ -43,7 +43,8 @@ function markdownToHtml(markdown) {
             .replace(/\u0000/g, "")
             .replace(
                 /`([^`]+)`/g,
-                (_, code) => hold(`<code>${escapeHtml(code)}</code>`),
+                (_, code) =>
+                    hold(`<code spellcheck="false">${escapeHtml(code)}</code>`),
             )
             .replace(
                 /\[([^\]]+)\]\(([^\s)]+?(?:\([^)]*\)[^\s)]*)*)\)/g,

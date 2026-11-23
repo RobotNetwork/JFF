@@ -326,7 +326,22 @@
                         data-cmd="removeFormat"
                         aria-label="Clear formatting"
                     >
-                        ✕
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 16 16"
+                            width="13"
+                            height="13"
+                            aria-hidden="true"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="M4.5 3h8.5" />
+                            <path d="M8.8 3 6.6 13" />
+                            <path d="M2.5 2.5 13.5 13.5" />
+                        </svg>
                     </button>
 
                 </div>
@@ -505,7 +520,9 @@
                     </button>
 
                     <button type="button" id="linkCancel">Cancel</button>
-                    <button type="submit" class="primary">Insert</button>
+                    <button type="submit" id="linkSubmit" class="primary">
+                        Insert
+                    </button>
                 </div>
             </form>
         </dialog>

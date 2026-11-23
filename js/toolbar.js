@@ -470,6 +470,8 @@ function buildCodeBlock(range) {
      */
     const pre = document.createElement("pre");
 
+    pre.setAttribute("spellcheck", "false");
+
     pre.textContent = touched
         .map((node) => {
             const text =
@@ -503,6 +505,8 @@ function wrapInlineCode() {
     if (rangeCrossesBlocks(range)) return;
 
     const code = document.createElement("code");
+
+    code.setAttribute("spellcheck", "false");
 
     try {
         range.surroundContents(code);

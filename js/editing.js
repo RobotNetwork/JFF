@@ -793,6 +793,7 @@ function applyTypedInlineCode() {
 
     const code = document.createElement("code");
 
+    code.setAttribute("spellcheck", "false");
     code.textContent = run.content;
 
     const first = run.segments[0];
