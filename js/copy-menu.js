@@ -116,7 +116,7 @@ async function copyOutput() {
 
     showNotice(
         cleared
-            ? "Copied and cleared, Ctrl+Z to undo."
+            ? `Copied and cleared, ${undoShortcutLabel()} to undo.`
             : "Copied to clipboard!",
     );
 }

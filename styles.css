@@ -1441,7 +1441,7 @@ main {
 /* A fixed first column keeps the chords in one line down the list. */
 .shortcut-list li {
     display: grid;
-    grid-template-columns: 7.5rem 1fr;
+    grid-template-columns: 8.75rem 1fr;
     gap: 12px;
     align-items: baseline;
 }

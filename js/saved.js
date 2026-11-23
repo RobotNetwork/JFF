@@ -405,7 +405,7 @@ function insertSavedMessage(id) {
     render();
     updateToolbarState();
     editor.focus();
-    showNotice(`Loaded "${record.name}", Ctrl+Z to undo.`);
+    showNotice(`Loaded "${record.name}", ${undoShortcutLabel()} to undo.`);
 }
 
 function insertSavedAtCaret(id) {

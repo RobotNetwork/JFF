@@ -218,13 +218,43 @@ linkDialog.addEventListener("close", () => {
  * appears here without a second edit, and the name comes from the toolbar
  * button that runs the same command, so a command has one name.
  */
-const extraShortcuts = [
-    // example:
-    // {
-    //     keys: "KEY",
-    //     label: "description",
-    // },
-];
+function isMacPlatform(
+    nav = typeof navigator !== "undefined" ? navigator : null,
+) {
+    if (!nav) return false;
+
+    const platform =
+        (nav.userAgentData && nav.userAgentData.platform) ||
+        nav.platform ||
+        nav.userAgent ||
+        "";
+
+    return /mac|iphone|ipad|ipod/i.test(platform);
+}
+
+/*
+ * Typing triggers and pointer/paste gestures that are not modifier chords
+ * in editingShortcuts, shown in the "Typing and gestures" section of
+ * Keyboard shortcuts.
+ */
+function getExtraShortcuts(mac = isMacPlatform()) {
+    return [
+        { keys: "# .. ######", label: "Heading 1-6 (start of line + Space)" },
+        { keys: "- / *", label: "Bullet list (start of line + Space)" },
+        { keys: "1.", label: "Numbered list (start of line + Space)" },
+        { keys: ">", label: "Blockquote (start of line + Space)" },
+        { keys: "`code`", label: "Inline code" },
+        {
+            keys: mac ? "Tab / ⇧Tab" : "Tab / Shift+Tab",
+            label: "Indent or outdent list item",
+        },
+        { keys: "Paste URL", label: "Turn selected text into a link" },
+        {
+            keys: mac ? "⌘+Click" : "Ctrl+Click",
+            label: "Open link in new tab",
+        },
+    ];
+}
 
 /* A code names the physical key, which is not the character it produces. */
 const chordKeys = {
@@ -262,56 +292,47 @@ function shortcutName(shortcut) {
     );
 }
 
-function chordLabel(shortcut) {
+function chordLabel(shortcut, mac = isMacPlatform()) {
+    const key = shortcut.code
+        ? chordKeys[shortcut.code] || shortcut.code
+        : shortcut.key.toUpperCase();
+
+    if (mac) {
+        const parts = [];
+
+        if (shortcut.alt) parts.push("⌥");
+        if (shortcut.shift) parts.push("⇧");
+        parts.push("⌘", key);
+
+        return parts.join("");
+    }
+
     const parts = ["Ctrl"];
 
     if (shortcut.shift) parts.push("Shift");
     if (shortcut.alt) parts.push("Alt");
-
-    parts.push(
-        shortcut.code
-            ? chordKeys[shortcut.code] || shortcut.code
-            : shortcut.key.toUpperCase(),
-    );
+    parts.push(key);
 
     return parts.join("+");
 }
 
+function undoShortcutLabel(mac = isMacPlatform()) {
+    return chordLabel({ key: "z" }, mac);
+}
+
 /* The chord and name of a numbered run, as one entry. Six heading rows would
    repeat the same chord shape, so the reference reads the range instead. */
-function shortcutRange(shortcut, count) {
-    const chord = chordLabel(shortcut);
+function shortcutRange(shortcut, count, mac = isMacPlatform()) {
+    const chord = chordLabel(shortcut, mac);
     const name = shortcutName(shortcut);
 
     return [
-        `${chord.slice(0, chord.lastIndexOf("+") + 1)}1-${count}`,
+        chord.replace(/\d+$/, `1-${count}`),
         `${name.replace(/\s*\d+$/, "")} 1-${count}`,
     ];
 }
 
-function buildShortcutList() {
-    const headingShortcuts = editingShortcuts.filter(
-        (shortcut) =>
-            shortcut.alt &&
-            shortcut.cmd === "formatBlock" &&
-            headingLevels.includes(shortcut.val),
-    );
-    const rows = [];
-
-    for (const shortcut of editingShortcuts) {
-        if (!headingShortcuts.includes(shortcut)) {
-            rows.push([chordLabel(shortcut), shortcutName(shortcut)]);
-        } else if (shortcut === headingShortcuts[0]) {
-            /*
-             * The table keeps one entry per heading level so matching stays
-             * exact; the reference shows the levels on one line.
-             */
-            rows.push(shortcutRange(shortcut, headingShortcuts.length));
-        }
-    }
-
-    rows.push(...extraShortcuts.map(({ keys, label }) => [keys, label]));
-
+function appendShortcutRows(list, rows) {
     for (const [keys, label] of rows) {
         const item = document.createElement("li");
         const chord = document.createElement("span");
@@ -322,7 +343,52 @@ function buildShortcutList() {
         name.textContent = label;
 
         item.append(chord, name);
-        shortcutList.append(item);
+        list.append(item);
+    }
+}
+
+function buildShortcutList(mac = isMacPlatform()) {
+    const headingShortcuts = editingShortcuts.filter(
+        (shortcut) =>
+            shortcut.alt &&
+            shortcut.cmd === "formatBlock" &&
+            headingLevels.includes(shortcut.val),
+    );
+    const rows = [];
+
+    for (const shortcut of editingShortcuts) {
+        if (!headingShortcuts.includes(shortcut)) {
+            rows.push([chordLabel(shortcut, mac), shortcutName(shortcut)]);
+        } else if (shortcut === headingShortcuts[0]) {
+            /*
+             * The table keeps one entry per heading level so matching stays
+             * exact; the reference shows the levels on one line.
+             */
+            rows.push(shortcutRange(shortcut, headingShortcuts.length, mac));
+        }
+    }
+
+    shortcutList.replaceChildren();
+    appendShortcutRows(shortcutList, rows);
+
+    const extraRows = getExtraShortcuts(mac).map(({ keys, label }) => [
+        keys,
+        label,
+    ]);
+
+    if (gestureList) {
+        gestureList.replaceChildren();
+        appendShortcutRows(gestureList, extraRows);
+    } else {
+        appendShortcutRows(shortcutList, extraRows);
+    }
+
+    if (tutorialCopyShortcut) {
+        const copyShortcut = shortcutFor("copyOutput");
+
+        if (copyShortcut) {
+            tutorialCopyShortcut.textContent = chordLabel(copyShortcut, mac);
+        }
     }
 }
 

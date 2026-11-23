@@ -34,6 +34,7 @@ const linkCancel = document.getElementById("linkCancel");
 const linkRemove = document.getElementById("linkRemove");
 const linkSubmit = document.getElementById("linkSubmit");
 const shortcutList = document.getElementById("shortcutList");
+const gestureList = document.getElementById("gestureList");
 const savedDropdown = document.getElementById("savedDropdown");
 const savedToggle = document.getElementById("savedToggle");
 const savedMenu = document.getElementById("savedMenu");
@@ -69,6 +70,7 @@ const tutorialNext = document.getElementById("tutorialNext");
 const tutorialHideInput = document.getElementById("tutorialHideInput");
 const tutorialStartInput = document.getElementById("tutorialStartInput");
 const tutorialOpenBtn = document.getElementById("tutorialOpenBtn");
+const tutorialCopyShortcut = document.getElementById("tutorialCopyShortcut");
 
 /*
  * Copy buttons in the action row and Preview header. render() disables them
