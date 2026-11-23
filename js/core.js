@@ -5,8 +5,15 @@
 const editor = document.getElementById("editor");
 const mirror = document.getElementById("mirror");
 const mirrorBody = document.getElementById("mirrorBody");
+const journalEntry = document.getElementById("journalEntry");
+const journalField = document.getElementById("journalField");
 const journalTime = document.getElementById("journalTime");
+const journalAccent = document.getElementById("journalAccent");
 const previewDialog = document.getElementById("previewDialog");
+const previewBox = previewDialog.querySelector(".preview-box");
+const previewTabs = document.getElementById("previewTabs");
+const previewRaw = document.getElementById("previewRaw");
+const previewCopy = document.getElementById("previewCopy");
 const previewClose = document.getElementById("previewClose");
 const previewBtn = document.getElementById("previewBtn");
 const copyBtn = document.getElementById("copyBtn");
@@ -59,10 +66,10 @@ const tutorialStartInput = document.getElementById("tutorialStartInput");
 const tutorialOpenBtn = document.getElementById("tutorialOpenBtn");
 
 /*
- * Copy is the one control that takes this path. render() disables it while
- * the entry holds nothing to copy.
+ * Copy buttons in the action row and Preview header. render() disables them
+ * while the entry holds nothing to copy.
  */
-const copyButtons = [copyBtn];
+const copyButtons = [copyBtn, previewCopy];
 
 /*
  * Whether the preview is on screen. It is the one thing that decides whether

@@ -54,20 +54,26 @@ const copyFeedbackDelay = 1500;
 let copyFeedbackTimer = null;
 
 function flashCopyButton() {
-    if (typeof copyBtn === "undefined" || !copyBtn) return;
-
-    if (!copyBtn.dataset.defaultLabel) {
-        copyBtn.dataset.defaultLabel = copyBtn.textContent.trim();
-    }
+    if (typeof copyButtons === "undefined") return;
 
     clearTimeout(copyFeedbackTimer);
-    copyBtn.textContent = "Copied";
-    copyBtn.classList.add("is-copied");
+
+    for (const button of copyButtons) {
+        if (!button) continue;
+        if (!button.dataset.defaultLabel) {
+            button.dataset.defaultLabel = button.textContent.trim();
+        }
+        button.textContent = "Copied";
+        button.classList.add("is-copied");
+    }
 
     copyFeedbackTimer = setTimeout(() => {
         copyFeedbackTimer = null;
-        copyBtn.textContent = copyBtn.dataset.defaultLabel;
-        copyBtn.classList.remove("is-copied");
+        for (const button of copyButtons) {
+            if (!button) continue;
+            button.textContent = button.dataset.defaultLabel;
+            button.classList.remove("is-copied");
+        }
     }, copyFeedbackDelay);
 }
 

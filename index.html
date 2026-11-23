@@ -381,7 +381,13 @@
                 </button>
 
                 <!-- The output view, opened over the entry. -->
-                <button type="button" id="previewBtn" aria-haspopup="dialog">
+                <button
+                    type="button"
+                    id="previewBtn"
+                    data-cmd="preview"
+                    aria-label="Preview"
+                    aria-haspopup="dialog"
+                >
                     Preview
                 </button>
 
@@ -438,51 +444,114 @@
         <dialog
             id="previewDialog"
             class="preview-dialog"
-            aria-label="Work notes preview"
+            aria-label="Journal entry preview"
         >
-            <div class="preview-box">
-                <div class="mirror-body" id="mirrorBody" tabindex="0">
-                    <div class="journal-entry">
-                        <div class="journal-head">
-                            <span
-                                class="journal-avatar"
-                                aria-hidden="true"
-                                >SA</span
-                            >
-                            <span class="journal-author"
-                                >System Administrator</span
-                            >
-                            <span class="journal-meta">
-                                <span class="journal-field"
-                                    >Work notes</span
-                                >
-                                <span class="journal-sep" aria-hidden="true"
-                                    >•</span
-                                >
-                                <time
-                                    class="journal-time"
-                                    id="journalTime"
-                                ></time>
-                            </span>
-                            <button
-                                type="button"
-                                id="previewClose"
-                                class="preview-close"
-                                aria-label="Close preview"
-                            >
-                                ×
-                            </button>
-                        </div>
+            <div class="preview-box" data-mode="work_notes">
+                <div class="preview-bar">
+                    <div
+                        class="preview-tabs"
+                        id="previewTabs"
+                        role="tablist"
+                        aria-label="Preview mode"
+                    >
+                        <button
+                            type="button"
+                            class="preview-tab"
+                            role="tab"
+                            data-mode="work_notes"
+                            aria-selected="true"
+                        >
+                            Work notes
+                        </button>
+                        <button
+                            type="button"
+                            class="preview-tab"
+                            role="tab"
+                            data-mode="comments"
+                            aria-selected="false"
+                        >
+                            Additional comments
+                        </button>
+                        <button
+                            type="button"
+                            class="preview-tab"
+                            role="tab"
+                            data-mode="raw"
+                            aria-selected="false"
+                        >
+                            Raw [code]
+                        </button>
+                    </div>
 
-                        <div
-                            class="mirror-field"
-                            id="mirror"
-                            data-empty="Nothing to preview yet."
-                        ></div>
+                    <div class="preview-bar-actions">
+                        <button
+                            type="button"
+                            id="previewCopy"
+                            class="preview-copy"
+                        >
+                            Copy [formatted]
+                        </button>
+                        <button
+                            type="button"
+                            id="previewClose"
+                            class="preview-close"
+                            aria-label="Close preview"
+                        >
+                            ×
+                        </button>
                     </div>
                 </div>
 
-                <span class="journal-accent" aria-hidden="true"></span>
+                <div class="preview-stage">
+                    <div class="mirror-body" id="mirrorBody" tabindex="0">
+                        <div class="journal-entry" id="journalEntry">
+                            <div class="journal-head">
+                                <span
+                                    class="journal-avatar"
+                                    aria-hidden="true"
+                                    >SA</span
+                                >
+                                <span class="journal-author"
+                                    >System Administrator</span
+                                >
+                                <span class="journal-meta">
+                                    <span
+                                        class="journal-field"
+                                        id="journalField"
+                                        >Work notes</span
+                                    >
+                                    <span
+                                        class="journal-sep"
+                                        aria-hidden="true"
+                                        >•</span
+                                    >
+                                    <time
+                                        class="journal-time"
+                                        id="journalTime"
+                                    ></time>
+                                </span>
+                            </div>
+
+                            <div
+                                class="mirror-field"
+                                id="mirror"
+                                data-empty="Nothing to preview yet."
+                            ></div>
+                        </div>
+
+                        <pre
+                            class="preview-raw"
+                            id="previewRaw"
+                            hidden
+                        ></pre>
+                    </div>
+
+                    <span
+                        class="journal-accent"
+                        id="journalAccent"
+                        aria-hidden="true"
+                    ></span>
+                </div>
             </div>
         </dialog>
 

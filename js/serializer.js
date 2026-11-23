@@ -499,6 +499,7 @@ function linesToBreaks(text) {
 function renderMirror(body) {
     mirror.replaceChildren(mirrorNodes(body));
     mirror.classList.toggle("is-empty", body === "");
+    previewRaw.textContent = body;
 }
 
 /*

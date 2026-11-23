@@ -351,6 +351,13 @@ const commands = {
             return true;
         },
     },
+    preview: {
+        run: () => {
+            togglePreviewDialog();
+
+            return true;
+        },
+    },
 };
 
 /*

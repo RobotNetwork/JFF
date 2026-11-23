@@ -17,6 +17,38 @@ function formatJournalTime(date) {
     );
 }
 
+let previewMode = "work_notes";
+
+function setPreviewMode(mode) {
+    if (mode !== "work_notes" && mode !== "comments" && mode !== "raw") {
+        mode = "work_notes";
+    }
+
+    previewMode = mode;
+    previewBox.dataset.mode = mode;
+
+    const isRaw = mode === "raw";
+
+    journalEntry.hidden = isRaw;
+    journalAccent.hidden = isRaw;
+    previewRaw.hidden = !isRaw;
+
+    if (mode === "work_notes") {
+        journalField.textContent = "Work notes";
+    } else if (mode === "comments") {
+        journalField.textContent = "Additional comments";
+    }
+
+    for (const tab of previewTabs.querySelectorAll(".preview-tab")) {
+        tab.setAttribute(
+            "aria-selected",
+            tab.dataset.mode === mode ? "true" : "false",
+        );
+    }
+
+    mirrorBody.scrollTop = 0;
+}
+
 /*
  * The field is rendered as the dialog opens rather than on every keystroke
  * behind a closed one, which is what makes it never a frame behind the entry:
@@ -31,6 +63,7 @@ function openPreviewDialog() {
     if (editorIsEmpty()) return;
 
     renderMirror(serializedBody());
+    setPreviewMode(previewMode);
 
     /* The timestamp is the current local time, taken as the dialog opens. */
     const now = new Date();
@@ -46,7 +79,25 @@ function openPreviewDialog() {
     mirrorBody.scrollTop = 0;
 }
 
-previewBtn.addEventListener("click", openPreviewDialog);
+function togglePreviewDialog() {
+    if (previewDialog.open) {
+        previewDialog.close();
+    } else {
+        openPreviewDialog();
+    }
+}
+
+previewTabs.addEventListener("click", (event) => {
+    const tab = event.target.closest(".preview-tab");
+
+    if (!tab) return;
+
+    setPreviewMode(tab.dataset.mode);
+});
+
+previewCopy.addEventListener("click", () => {
+    copyOutput();
+});
 
 previewClose.addEventListener("click", () => {
     previewDialog.close();

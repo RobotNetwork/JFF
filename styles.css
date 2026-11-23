@@ -743,6 +743,116 @@ main {
     background: #fff;
 }
 
+.preview-bar {
+    flex: none;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+}
+
+.preview-tabs {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--bg);
+}
+
+.preview-tab {
+    padding: 4px 10px;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.preview-tab:hover {
+    color: var(--text);
+}
+
+.preview-tab[aria-selected="true"] {
+    background: var(--accent);
+    color: var(--accent-ink);
+}
+
+.preview-bar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.preview-copy {
+    padding: 4px 10px;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.preview-copy:hover:not(:disabled) {
+    filter: brightness(1.08);
+}
+
+.preview-copy:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.preview-copy.is-copied {
+    background: var(--bg);
+    color: var(--accent-text);
+    border-color: var(--accent);
+}
+
+.preview-stage {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.preview-raw {
+    margin: 0;
+    padding: 12px 14px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.preview-box[data-mode="raw"] .mirror-body {
+    padding: 0;
+    background: var(--code-bg);
+}
+
+.preview-box[data-mode="comments"] .journal-accent {
+    background-color: rgb(119, 145, 168);
+    opacity: 0.9;
+}
+
 /* ---------- Work notes mirror ---------- */
 
 /*
@@ -898,13 +1008,13 @@ main {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     padding: 0;
     border: 1px solid transparent;
     border-radius: 4px;
     background: transparent;
-    color: rgb(76, 86, 92);
+    color: var(--muted);
     font-family: inherit;
     font-size: 18px;
     line-height: 1;
@@ -912,9 +1022,9 @@ main {
 }
 
 .preview-close:hover {
-    border-color: rgb(180, 187, 192);
-    background: rgb(240, 242, 245);
-    color: rgb(16, 23, 26);
+    border-color: var(--border-strong);
+    background: var(--bg);
+    color: var(--text);
 }
 
 /* ---------- Saved messages ---------- */

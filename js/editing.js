@@ -401,12 +401,15 @@ editor.addEventListener("keydown", (event) => {
     updateToolbarState();
 });
 
-const globalShortcutCommands = new Set(["copyOutput", "help"]);
+const globalShortcutCommands = new Set(["copyOutput", "preview", "help"]);
 
 document.addEventListener("keydown", (event) => {
     if (editor.contains(event.target)) return;
 
-    if (document.querySelector("dialog[open]")) return;
+    const openDialog = document.querySelector("dialog[open]");
+    const inPreview = openDialog === previewDialog;
+
+    if (openDialog && !inPreview) return;
 
     const mod = event.ctrlKey || event.metaKey;
 
@@ -415,6 +418,9 @@ document.addEventListener("keydown", (event) => {
     const shortcut = editingShortcuts.find(
         (entry) =>
             globalShortcutCommands.has(entry.cmd) &&
+            (!inPreview ||
+                entry.cmd === "preview" ||
+                entry.cmd === "copyOutput") &&
             matchesShortcut(entry, event),
     );
 
