@@ -192,9 +192,20 @@ const commands = {
 
             return execCommand("formatBlock", value);
         },
-        isActive: (value) =>
-            normalizeBlockName(document.queryCommandValue("formatBlock")) ===
-            normalizeBlockName(value),
+        isActive: (value, element) => {
+            const tag = normalizeBlockName(value);
+
+            if (tag === "blockquote") {
+                const quote = element ? element.closest("blockquote") : null;
+
+                return Boolean(quote && editor.contains(quote));
+            }
+
+            return (
+                normalizeBlockName(document.queryCommandValue("formatBlock")) ===
+                tag
+            );
+        },
     },
     inlineCode: {
         run: () => {
@@ -235,15 +246,33 @@ const commands = {
              * here: the code text becomes paragraphs and the pre goes.
              */
             const selection = window.getSelection();
-            const element = selection.rangeCount
-                ? getSelectedElement()
-                : lastSelectedElement;
-            const pre = element ? element.closest("pre") : null;
+            const range = selection.rangeCount ? selection.getRangeAt(0) : null;
+            let pre = null;
 
-            if (pre && editor.contains(pre)) {
-                const range = selection.rangeCount
-                    ? selection.getRangeAt(0)
-                    : null;
+            if (range) {
+                const startPre = closestElement(range.startContainer)?.closest(
+                    "pre",
+                );
+                const endPre = closestElement(range.endContainer)?.closest(
+                    "pre",
+                );
+
+                if (
+                    startPre &&
+                    startPre === endPre &&
+                    editor.contains(startPre)
+                ) {
+                    pre = startPre;
+                }
+            } else if (lastSelectedElement) {
+                const candidate = lastSelectedElement.closest("pre");
+
+                if (candidate && editor.contains(candidate)) {
+                    pre = candidate;
+                }
+            }
+
+            if (pre) {
                 const start = range
                     ? { node: range.startContainer, offset: range.startOffset }
                     : null;
@@ -267,7 +296,6 @@ const commands = {
              * sit. A single block still goes through the command, which
              * keeps the caret where it was.
              */
-            const range = selection.rangeCount ? selection.getRangeAt(0) : null;
             const built =
                 range && !range.collapsed ? buildCodeBlock(range) : null;
 
@@ -482,8 +510,32 @@ function buildCodeBlock(range) {
         .join("\n")
         .replace(/^\n+|\n+$/g, "");
 
-    touched[0].before(pre);
-    touched.forEach((node) => node.remove());
+    if (parent.tagName === "UL" || parent.tagName === "OL") {
+        const firstIndex = Math.min(start, end);
+        const lastIndex = Math.max(start, end);
+        const before = children.slice(0, firstIndex);
+        const after = children.slice(lastIndex + 1);
+
+        if (before.length === 0) {
+            parent.before(pre);
+            touched.forEach((node) => node.remove());
+
+            if (after.length === 0) parent.remove();
+        } else {
+            parent.after(pre);
+            touched.forEach((node) => node.remove());
+
+            if (after.length > 0) {
+                const tail = parent.cloneNode(false);
+
+                after.forEach((node) => tail.appendChild(node));
+                pre.after(tail);
+            }
+        }
+    } else {
+        touched[0].before(pre);
+        touched.forEach((node) => node.remove());
+    }
 
     return pre;
 }
@@ -556,13 +608,21 @@ function blockAtCaretMatches(value) {
     const element = selection.rangeCount
         ? getSelectedElement()
         : lastSelectedElement;
+    const tag = normalizeBlockName(value);
+
+    if (tag === "blockquote") {
+        const quote = element ? element.closest("blockquote") : null;
+
+        return Boolean(quote && editor.contains(quote));
+    }
+
     const block = element ? caretBlock(element) : null;
 
     return Boolean(
         block &&
             block !== editor &&
             block.nodeType === Node.ELEMENT_NODE &&
-            block.tagName.toLowerCase() === normalizeBlockName(value),
+            block.tagName.toLowerCase() === tag,
     );
 }
 
@@ -599,11 +659,22 @@ function clearBlockFormatting(value) {
     const end = live
         ? { node: range.endContainer, offset: range.endOffset }
         : null;
-    const lines = formattingLines(range).filter(
-        (line) =>
-            line.nodeType === Node.ELEMENT_NODE &&
-            line.tagName.toLowerCase() === normalizeBlockName(value),
-    );
+    const targetTag = normalizeBlockName(value);
+    const rawLines = formattingLines(range);
+    const lines =
+        targetTag === "blockquote"
+            ? [
+                  ...new Set(
+                      rawLines
+                          .map((line) => closestElement(line)?.closest("blockquote"))
+                          .filter((quote) => quote && editor.contains(quote)),
+                  ),
+              ]
+            : rawLines.filter(
+                  (line) =>
+                      line.nodeType === Node.ELEMENT_NODE &&
+                      line.tagName.toLowerCase() === targetTag,
+              );
 
     if (!lines.length) return false;
 

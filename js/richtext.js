@@ -140,11 +140,6 @@ function normalizeInlineStyles(doc) {
             (strikeTags.has(tag) && isStrikeOff(style)) ||
             (underlineTags.has(tag) && isUnderlineOff(style));
 
-        if (formatsOff) {
-            unwrapElement(element);
-            continue;
-        }
-
         if (hasBoldStyle(style) && !boldTags.has(tag)) {
             wrapElementContents(element, "strong");
         }
@@ -159,6 +154,10 @@ function normalizeInlineStyles(doc) {
 
         if (hasUnderlineStyle(style) && !underlineTags.has(tag)) {
             wrapElementContents(element, "u");
+        }
+
+        if (formatsOff) {
+            unwrapElement(element);
         }
     }
 
@@ -199,6 +198,35 @@ function distributeFormattingOverBlocks(root) {
         if (!wrapsOnlyBlocks) continue;
 
         for (const block of children) {
+            const blockTag = block.tagName.toLowerCase();
+
+            if (blockTag === "pre") {
+                wrapper.parentNode.insertBefore(block, wrapper);
+                continue;
+            }
+
+            if (blockTag === "ul" || blockTag === "ol") {
+                for (const item of block.querySelectorAll("li")) {
+                    const inlineNodes = [...item.childNodes].filter(
+                        (child) =>
+                            child.nodeType !== Node.ELEMENT_NODE ||
+                            (child.tagName !== "UL" && child.tagName !== "OL"),
+                    );
+
+                    if (inlineNodes.length === 0) continue;
+
+                    const copy = wrapper.cloneNode(false);
+
+                    inlineNodes[0].before(copy);
+                    for (const child of inlineNodes) {
+                        copy.appendChild(child);
+                    }
+                }
+
+                wrapper.parentNode.insertBefore(block, wrapper);
+                continue;
+            }
+
             const copy = wrapper.cloneNode(false);
 
             while (block.firstChild) {
