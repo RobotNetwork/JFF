@@ -329,10 +329,15 @@ main {
    controls read like the letter buttons beside them. */
 .toolbar button[data-cmd="link"],
 .toolbar button[data-cmd="inlineCode"],
+.toolbar button[data-cmd="removeFormat"],
 .toolbar button[data-cmd="formatBlock"][data-val="blockquote"] {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+}
+
+button svg {
+    pointer-events: none;
 }
 
 .toolbar .sep {

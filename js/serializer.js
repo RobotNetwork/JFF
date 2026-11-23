@@ -538,6 +538,10 @@ function render() {
     /* Nothing to save is the one reason the menu's Save current is out. */
     savedSaveBtn.disabled = empty;
 
+    if (typeof updateSavedToggleState === "function") {
+        updateSavedToggleState();
+    }
+
     if (clearBtn) clearBtn.disabled = empty;
 
     /*

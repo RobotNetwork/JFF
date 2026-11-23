@@ -115,6 +115,8 @@ function writeSaved(records) {
             JSON.stringify(records),
         );
 
+        updateSavedToggleState(records.length);
+
         return true;
     } catch {
         showNotice("Saved messages could not be written: the store is full.", {
@@ -257,7 +259,19 @@ function renderSavedMenu() {
     savedSaveBtn.disabled = entryEmpty;
 }
 
+function updateSavedToggleState(savedCount = readSaved().length) {
+    const disabled = editorIsEmpty() && savedCount === 0;
+
+    savedToggle.disabled = disabled;
+
+    if (disabled && !savedMenu.hidden) {
+        setSavedMenuOpen(false);
+    }
+}
+
 function setSavedMenuOpen(open, focusFirst = false) {
+    if (open && savedToggle.disabled) return;
+
     if (open) {
         savedSearch.value = "";
         renderSavedMenu();
