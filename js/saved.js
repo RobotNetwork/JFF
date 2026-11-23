@@ -177,8 +177,6 @@ savedToggle.addEventListener("click", (event) => {
     setSavedMenuOpen(savedMenu.hidden, event.detail === 0);
 });
 
-const savedDropdown = savedMenu.closest("#savedDropdown") ?? savedMenu.parentElement;
-
 /* Arrow keys move across saved rows (and Save current); Tab moves freely across controls. */
 savedMenu.addEventListener("keydown", (event) => {
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
