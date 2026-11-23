@@ -390,6 +390,12 @@ function mirrorNodes(body) {
         const region = document.createElement("template");
 
         region.innerHTML = part.slice(codeOpen.length, -codeClose.length);
+
+        for (const link of region.content.querySelectorAll("a")) {
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+        }
+
         fragment.append(region.content);
     });
 
@@ -397,37 +403,19 @@ function mirrorNodes(body) {
 }
 
 /*
- * Prose with its newlines rendered as line breaks. The newlines the serializer
- * writes are text, so only text nodes are rewritten and a tag's own content is
- * left alone; a line inside a [code] region never reaches here.
+ * Prose with its newlines rendered as line breaks. Plain text outside [code]
+ * is rendered literally by ServiceNow, so it is built directly from Text nodes
+ * and <br> elements without parsing HTML.
  */
-function linesToBreaks(html) {
-    const template = document.createElement("template");
+function linesToBreaks(text) {
+    const lines = document.createDocumentFragment();
 
-    template.innerHTML = html;
+    text.split("\n").forEach((line, index) => {
+        if (index > 0) lines.append(document.createElement("br"));
+        if (line) lines.append(document.createTextNode(line));
+    });
 
-    const walker = document.createTreeWalker(
-        template.content,
-        NodeFilter.SHOW_TEXT,
-    );
-    const texts = [];
-
-    while (walker.nextNode()) texts.push(walker.currentNode);
-
-    for (const node of texts) {
-        if (!node.data.includes("\n")) continue;
-
-        const lines = document.createDocumentFragment();
-
-        node.data.split("\n").forEach((line, index) => {
-            if (index > 0) lines.append(document.createElement("br"));
-            if (line) lines.append(document.createTextNode(line));
-        });
-
-        node.replaceWith(lines);
-    }
-
-    return template.content;
+    return lines;
 }
 
 function renderMirror(body) {
