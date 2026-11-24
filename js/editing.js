@@ -1242,14 +1242,143 @@ function formattingLines(range) {
     return [...lines];
 }
 
+function firstLeafNode(node) {
+    let cur = node;
+
+    while (cur && cur.firstChild) cur = cur.firstChild;
+
+    return cur;
+}
+
+function lastLeafNode(node) {
+    let cur = node;
+
+    while (cur && cur.lastChild) cur = cur.lastChild;
+
+    return cur;
+}
+
+function highestClearedInline(node) {
+    let cur = closestElement(node);
+    let highest = null;
+
+    while (cur && cur !== editor) {
+        if (cur.matches(clearedInlineSelector)) highest = cur;
+        cur = cur.parentElement;
+    }
+
+    return highest;
+}
+
+function rangeHasContent(range) {
+    if (range.toString() !== "") return true;
+
+    return Boolean(range.cloneContents().querySelector("*"));
+}
+
+function splitClearedInlineAt(ancestor, container, offset) {
+    const before = document.createRange();
+
+    before.setStart(ancestor, 0);
+    before.setEnd(container, offset);
+
+    if (!rangeHasContent(before)) return { position: "start", split: null };
+
+    const after = document.createRange();
+
+    after.setStart(container, offset);
+    after.setEnd(ancestor, ancestor.childNodes.length);
+
+    if (!rangeHasContent(after)) return { position: "end", split: null };
+
+    const clone = ancestor.cloneNode(false);
+
+    clone.appendChild(after.extractContents());
+    ancestor.after(clone);
+
+    return { position: "middle", split: clone };
+}
+
+/*
+ * Unwraps only clearedInlineSelector tags intersecting a non-collapsed range,
+ * splitting partially selected inline wrappers at the range edges so inline
+ * <code> spans and <a> links stay intact.
+ */
+function clearInlineFormatsInRange(range) {
+    const endAncestor = highestClearedInline(range.endContainer);
+
+    if (endAncestor) {
+        const result = splitClearedInlineAt(
+            endAncestor,
+            range.endContainer,
+            range.endOffset,
+        );
+
+        if (result.position === "start") {
+            range.setEndBefore(endAncestor);
+        } else if (result.split) {
+            const endLeaf = lastLeafNode(endAncestor);
+
+            if (endLeaf) {
+                range.setEnd(endLeaf, nodeOffset(endLeaf));
+            } else {
+                range.setEnd(endAncestor, endAncestor.childNodes.length);
+            }
+        }
+    }
+
+    const startAncestor = highestClearedInline(range.startContainer);
+
+    if (startAncestor) {
+        const endInsideStart = startAncestor.contains(range.endContainer);
+        const result = splitClearedInlineAt(
+            startAncestor,
+            range.startContainer,
+            range.startOffset,
+        );
+
+        if (result.position === "end") {
+            range.setStartAfter(startAncestor);
+        } else if (result.split) {
+            const startLeaf = firstLeafNode(result.split);
+
+            if (startLeaf) {
+                range.setStart(startLeaf, 0);
+            } else {
+                range.setStart(result.split, 0);
+            }
+
+            if (endInsideStart) {
+                const endLeaf = lastLeafNode(result.split);
+
+                if (endLeaf) {
+                    range.setEnd(endLeaf, nodeOffset(endLeaf));
+                } else {
+                    range.setEnd(result.split, result.split.childNodes.length);
+                }
+            }
+        }
+    }
+
+    const start = { node: range.startContainer, offset: range.startOffset };
+    const end = { node: range.endContainer, offset: range.endOffset };
+
+    const targets = [...editor.querySelectorAll(clearedInlineSelector)].filter(
+        (el) => !el.closest("pre") && range.intersectsNode(el),
+    );
+
+    for (const el of targets) {
+        if (el.isConnected) unwrapElement(el);
+    }
+
+    return { start, end };
+}
+
 /*
  * Clear formatting drops block formatting and character formatting together.
- * The browser's own removeFormat only handles character formatting, and with a
- * collapsed caret it leaves the document untouched, so a heading survived it
- * and the button read as broken. Headings and quotes are turned back into
- * paragraphs here; the inline tags the toolbar writes are unwrapped, and a
- * ranged selection is handed to removeFormat, which splits a partly selected
- * tag rather than clearing the whole of it.
+ * Headings and quotes are turned back into paragraphs here; the inline tags
+ * the toolbar writes are unwrapped (splitting partly selected wrappers on a
+ * ranged selection) while preserving inline <code> spans and links.
  */
 function clearFormatting() {
     const selection = window.getSelection();
@@ -1263,21 +1392,12 @@ function clearFormatting() {
     const collapsed = range.collapsed;
     const lines = formattingLines(range);
 
-    if (!collapsed) document.execCommand("removeFormat");
+    let start = { node: range.startContainer, offset: range.startOffset };
+    let end = { node: range.endContainer, offset: range.endOffset };
 
-    /*
-     * The selection is read after the browser command, which splits the tags
-     * it partly covers, and kept as nodes rather than as a Range: moving a
-     * text node into its new block moves a Range's boundary out of it.
-     */
-    const liveSelection = window.getSelection();
-    const live = liveSelection.rangeCount ? liveSelection.getRangeAt(0) : null;
-    const start = live
-        ? { node: live.startContainer, offset: live.startOffset }
-        : null;
-    const end = live
-        ? { node: live.endContainer, offset: live.endOffset }
-        : null;
+    if (!collapsed) {
+        ({ start, end } = clearInlineFormatsInRange(range));
+    }
 
     const cleared = lines.map((line) => {
         if (collapsed) {

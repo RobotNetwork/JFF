@@ -893,6 +893,26 @@ function linkInRange(range) {
         : null;
 }
 
+function rangeTouchesPre(range) {
+    if (!range) return false;
+
+    const startPre = closestElement(range.startContainer)?.closest("pre");
+
+    if (startPre && editor.contains(startPre)) return true;
+
+    const endPre = closestElement(range.endContainer)?.closest("pre");
+
+    if (endPre && editor.contains(endPre)) return true;
+
+    if (!range.collapsed) {
+        for (const pre of editor.querySelectorAll("pre")) {
+            if (range.intersectsNode(pre)) return true;
+        }
+    }
+
+    return false;
+}
+
 /*
  * The dialog takes focus, and both createLink and the caret restore need the
  * selection the command was invoked on, so the range is cloned up front and
@@ -910,6 +930,7 @@ function insertLink() {
             : null;
 
     if (!source) return false;
+    if (rangeTouchesPre(source)) return true;
 
     openLinkDialog(source.cloneRange(), linkInRange(source));
 

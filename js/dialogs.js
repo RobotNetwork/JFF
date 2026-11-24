@@ -172,6 +172,7 @@ linkDialog.addEventListener("close", () => {
     }
 
     if (!pending.href) return;
+    if (rangeTouchesPre(pending.range)) return;
 
     /*
      * The command was run on a link, so that link's href is replaced rather
