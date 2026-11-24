@@ -573,11 +573,11 @@ function preservingSelection(item, move) {
     const saved =
         selection.rangeCount > 0
             ? {
-                  start: selection.getRangeAt(0).startContainer,
-                  startOffset: selection.getRangeAt(0).startOffset,
-                  end: selection.getRangeAt(0).endContainer,
-                  endOffset: selection.getRangeAt(0).endOffset,
-              }
+                start: selection.getRangeAt(0).startContainer,
+                startOffset: selection.getRangeAt(0).startOffset,
+                end: selection.getRangeAt(0).endContainer,
+                endOffset: selection.getRangeAt(0).endOffset,
+            }
             : null;
     const result = move();
 
