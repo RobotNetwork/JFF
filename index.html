@@ -481,28 +481,37 @@
                     >
                         <button
                             type="button"
+                            id="previewTab-work_notes"
                             class="preview-tab"
                             role="tab"
                             data-mode="work_notes"
                             aria-selected="true"
+                            aria-controls="mirrorBody"
+                            tabindex="0"
                         >
                             Work notes
                         </button>
                         <button
                             type="button"
+                            id="previewTab-comments"
                             class="preview-tab"
                             role="tab"
                             data-mode="comments"
                             aria-selected="false"
+                            aria-controls="mirrorBody"
+                            tabindex="-1"
                         >
                             Additional comments
                         </button>
                         <button
                             type="button"
+                            id="previewTab-raw"
                             class="preview-tab"
                             role="tab"
                             data-mode="raw"
                             aria-selected="false"
+                            aria-controls="mirrorBody"
+                            tabindex="-1"
                         >
                             Raw [code]
                         </button>
@@ -528,7 +537,13 @@
                 </div>
 
                 <div class="preview-stage">
-                    <div class="mirror-body" id="mirrorBody" tabindex="0">
+                    <div
+                        class="mirror-body"
+                        id="mirrorBody"
+                        role="tabpanel"
+                        aria-labelledby="previewTab-work_notes"
+                        tabindex="0"
+                    >
                         <div class="journal-entry" id="journalEntry">
                             <div class="journal-head">
                                 <span
@@ -757,7 +772,7 @@
                                     role="switch"
                                     aria-checked="false"
                                     aria-label="Light mode"
-                                    title="Light mode"
+                                    title="Switch to light mode"
                                 >
                                     <svg
                                         class="theme-icon theme-icon-sun"

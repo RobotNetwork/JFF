@@ -40,10 +40,14 @@ function setPreviewMode(mode) {
     }
 
     for (const tab of previewTabs.querySelectorAll(".preview-tab")) {
-        tab.setAttribute(
-            "aria-selected",
-            tab.dataset.mode === mode ? "true" : "false",
-        );
+        const selected = tab.dataset.mode === mode;
+
+        tab.setAttribute("aria-selected", selected ? "true" : "false");
+        tab.tabIndex = selected ? 0 : -1;
+
+        if (selected && tab.id) {
+            mirrorBody.setAttribute("aria-labelledby", tab.id);
+        }
     }
 
     mirrorBody.scrollTop = 0;
@@ -93,6 +97,40 @@ previewTabs.addEventListener("click", (event) => {
     if (!tab) return;
 
     setPreviewMode(tab.dataset.mode);
+});
+
+previewTabs.addEventListener("keydown", (event) => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+    const current = event.target.closest(".preview-tab");
+
+    if (!current) return;
+
+    const tabs = [...previewTabs.querySelectorAll(".preview-tab")];
+    const index = tabs.indexOf(current);
+
+    if (index === -1) return;
+
+    let nextIndex;
+
+    if (event.key === "ArrowRight") {
+        nextIndex = (index + 1) % tabs.length;
+    } else if (event.key === "ArrowLeft") {
+        nextIndex = (index - 1 + tabs.length) % tabs.length;
+    } else if (event.key === "Home") {
+        nextIndex = 0;
+    } else if (event.key === "End") {
+        nextIndex = tabs.length - 1;
+    } else {
+        return;
+    }
+
+    event.preventDefault();
+
+    const nextTab = tabs[nextIndex];
+
+    setPreviewMode(nextTab.dataset.mode);
+    nextTab.focus();
 });
 
 previewCopy.addEventListener("click", () => {

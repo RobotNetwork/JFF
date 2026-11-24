@@ -177,10 +177,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const themeToggle = document.getElementById("themeToggle");
 
     function syncThemeToggle() {
-        themeToggle.setAttribute(
-            "aria-checked",
-            String(themeRoot.dataset.theme === "light"),
-        );
+        const isLight = themeRoot.dataset.theme === "light";
+
+        themeToggle.setAttribute("aria-checked", String(isLight));
+        themeToggle.title = isLight
+            ? "Switch to dark mode"
+            : "Switch to light mode";
     }
 
     themeToggle.addEventListener("click", () => {

@@ -119,9 +119,15 @@ async function copyOutput() {
         clearEntry();
     }
 
-    showNotice(
-        cleared
-            ? `Copied and cleared, ${undoShortcutLabel()} to undo.`
-            : "Copied to clipboard!",
-    );
+    if (cleared) {
+        showNotice(`Copied and cleared, ${undoShortcutLabel()} to undo.`, {
+            actionLabel: "Undo",
+            onAction: () => {
+                restore(-1);
+                editor.focus();
+            },
+        });
+    } else {
+        showNotice("Copied to clipboard!");
+    }
 }
