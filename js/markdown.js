@@ -177,7 +177,7 @@ function markdownToHtml(markdown) {
             continue;
         }
 
-        if (/^\s*```[\w-]*\s*$/.test(line)) {
+        if (/^\s*```[^`]*$/.test(line)) {
             closeAllLists();
             closeQuote();
             pendingBlank = false;

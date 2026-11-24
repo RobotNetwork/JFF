@@ -26,12 +26,13 @@ const codeShapes = [
     /^\s*from\s+[\w.]+\s+import\b/,
     /^\s*(?:SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|FROM|WHERE|JOIN|INNER\s+JOIN|LEFT\s+JOIN|GROUP\s+BY|ORDER\s+BY|HAVING|LIMIT)\b/,
     /\b(?:console|printf|require)\s*\(/,
-    /[A-Za-z_$][\w$]*\s*\(/,
+    /[A-Za-z_$][\w$]*\(/,
     /\w\s*[=<>!]=?\s*\S/,
     /^\s+(?![-*+]\s|\d+[.)]\s)\S/,
 ];
 
 const codeComments = /^\s*(?:#|\/\/|--|;|%)/;
+const markdownHeading = /^#{1,6}\s+\S/;
 const markdownListOrQuote = /^\s*(?:[-*+]\s+|\d+[.)]\s+|>\s)/;
 
 /*
@@ -39,17 +40,22 @@ const markdownListOrQuote = /^\s*(?:[-*+]\s+|\d+[.)]\s+|>\s)/;
  * the markdown parser, whatever its comment lines look like. It counts as
  * code when there are at least two lines and every non-empty line is either
  * a comment or one of the shapes above, with at least one shape rather than
- * only comments.
+ * only comments (or at least two shapes when a Markdown-like `# ` heading is
+ * present).
  */
 function looksLikeCode(text) {
     const lines = text.split(/\r?\n/).filter((line) => line.trim() !== "");
 
     if (lines.length < 2) return false;
 
-    let definite = false;
+    let definite = 0;
+    let hasHeadingLikeComment = false;
 
     for (const line of lines) {
-        if (codeComments.test(line)) continue;
+        if (codeComments.test(line)) {
+            if (markdownHeading.test(line)) hasHeadingLikeComment = true;
+            continue;
+        }
 
         if (markdownListOrQuote.test(line)) return false;
 
@@ -57,10 +63,10 @@ function looksLikeCode(text) {
             return false;
         }
 
-        definite = true;
+        definite++;
     }
 
-    return definite;
+    return hasHeadingLikeComment ? definite >= 2 : definite >= 1;
 }
 
 function looksLikeMarkdown(text) {
