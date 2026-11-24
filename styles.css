@@ -359,8 +359,11 @@ button svg {
 .notice {
     position: fixed;
     top: 0;
+    right: auto;
+    bottom: auto;
     left: 50%;
     z-index: 50;
+    margin: 0;
     width: max-content;
     max-width: min(560px, calc(100vw - 24px));
     padding: 8px 14px;

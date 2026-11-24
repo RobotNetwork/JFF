@@ -112,7 +112,12 @@ async function copyOutput() {
     /* The one-step loop: copy and the entry resets itself for the next one. */
     const cleared = clearAfterCopyEnabled && !editorIsEmpty();
 
-    if (cleared) clearEntry();
+    if (cleared) {
+        if (typeof previewDialog !== "undefined" && previewDialog.open) {
+            previewDialog.close();
+        }
+        clearEntry();
+    }
 
     showNotice(
         cleared

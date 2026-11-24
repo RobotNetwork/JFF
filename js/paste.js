@@ -14,18 +14,44 @@ const droppedMediaSelector =
 
 const noticeDelay = 5000;
 const noticeActionDelay = 7000;
+const noticeHideTransitionDelay = 260;
 
 let noticeTimer = null;
 let noticeFrame = null;
+let noticePopoverTimer = null;
+
+function openNoticePopover() {
+    if (typeof notice.showPopover !== "function") return;
+
+    try {
+        if (notice.matches(":popover-open")) notice.hidePopover();
+        notice.showPopover();
+    } catch {
+        /* Fallback to fixed positioning when popover promotion is unavailable. */
+    }
+}
+
+function closeNoticePopover() {
+    if (typeof notice.hidePopover !== "function") return;
+
+    try {
+        if (notice.matches(":popover-open")) notice.hidePopover();
+    } catch {
+        /* Already closed or unsupported. */
+    }
+}
 
 function hideNotice() {
     clearTimeout(noticeTimer);
     noticeTimer = null;
+    clearTimeout(noticePopoverTimer);
+    noticePopoverTimer = null;
     if (noticeFrame !== null && typeof cancelAnimationFrame === "function") {
         cancelAnimationFrame(noticeFrame);
         noticeFrame = null;
     }
     notice.classList.remove("is-visible", "has-action");
+    closeNoticePopover();
 }
 
 function showNotice(
@@ -36,41 +62,45 @@ function showNotice(
     const hasAction = Boolean(actionLabel && typeof onAction === "function");
 
     clearTimeout(noticeTimer);
+    clearTimeout(noticePopoverTimer);
+    noticePopoverTimer = null;
     if (noticeFrame !== null && typeof cancelAnimationFrame === "function") {
         cancelAnimationFrame(noticeFrame);
         noticeFrame = null;
     }
+
+    openNoticePopover();
 
     notice.setAttribute("role", isError ? "alert" : "status");
     notice.setAttribute("aria-live", isError ? "assertive" : "polite");
     notice.classList.toggle("is-error", isError);
     notice.classList.toggle("has-action", hasAction);
     notice.textContent = "";
-    notice.classList.add("is-visible");
 
     const commit = () => {
         noticeFrame = null;
 
         if (!hasAction) {
             notice.textContent = message;
-            return;
+        } else {
+            const text = document.createElement("span");
+            const button = document.createElement("button");
+
+            text.className = "notice-text";
+            text.textContent = message;
+
+            button.type = "button";
+            button.className = "notice-action";
+            button.textContent = actionLabel;
+            button.addEventListener("click", () => {
+                hideNotice();
+                onAction();
+            });
+
+            notice.replaceChildren(text, button);
         }
 
-        const text = document.createElement("span");
-        const button = document.createElement("button");
-
-        text.className = "notice-text";
-        text.textContent = message;
-
-        button.type = "button";
-        button.className = "notice-action";
-        button.textContent = actionLabel;
-        button.addEventListener("click", () => {
-            hideNotice();
-            onAction();
-        });
-
-        notice.replaceChildren(text, button);
+        notice.classList.add("is-visible");
     };
 
     if (typeof requestAnimationFrame === "function") {
@@ -82,6 +112,10 @@ function showNotice(
     noticeTimer = setTimeout(() => {
         noticeTimer = null;
         notice.classList.remove("is-visible", "has-action");
+        noticePopoverTimer = setTimeout(() => {
+            noticePopoverTimer = null;
+            closeNoticePopover();
+        }, noticeHideTransitionDelay);
     }, hasAction ? noticeActionDelay : noticeDelay);
 }
 
