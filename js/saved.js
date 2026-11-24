@@ -145,22 +145,28 @@ function messageText(html) {
     return doc.body.textContent;
 }
 
-/*
- * The row's second line: the message's words flattened onto one line, so two
- * messages that ended up with the same name are still told apart.
- */
-function savedPreview(html) {
-    const text = messageText(html).replace(/\s+/g, " ").trim();
-
+function savedPreviewFromText(text) {
     return text.length > savedPreviewLimit
         ? `${text.slice(0, savedPreviewLimit).trimEnd()}…`
         : text;
 }
 
+function savedPlainText(html) {
+    return messageText(html).replace(/\s+/g, " ").trim();
+}
+
+/*
+ * The row's second line: the message's words flattened onto one line, so two
+ * messages that ended up with the same name are still told apart.
+ */
+function savedPreview(html) {
+    return savedPreviewFromText(savedPlainText(html));
+}
+
 const savedSearchThreshold = 5;
 let renderingSavedMenu = false;
 
-function savedRow(record, entryEmpty) {
+function savedRow(record, entryEmpty, previewText = savedPreview(record.html)) {
     const item = document.createElement("li");
     const insert = document.createElement("button");
     const name = document.createElement("span");
@@ -182,7 +188,7 @@ function savedRow(record, entryEmpty) {
     name.textContent = record.name;
 
     preview.className = "saved-preview";
-    preview.textContent = savedPreview(record.html);
+    preview.textContent = previewText;
 
     insert.append(name, preview);
 
@@ -254,13 +260,22 @@ function renderSavedMenu() {
         if (!showSearch) savedSearch.value = "";
 
         const query = showSearch ? savedSearch.value.trim().toLowerCase() : "";
+        const entries = records.map((record) => {
+            const text = savedPlainText(record.html);
+
+            return {
+                record,
+                text,
+                preview: savedPreviewFromText(text),
+            };
+        });
         const filtered = query
-            ? records.filter(
-                  (record) =>
+            ? entries.filter(
+                  ({ record, text }) =>
                       record.name.toLowerCase().includes(query) ||
-                      savedPreview(record.html).toLowerCase().includes(query),
+                      text.toLowerCase().includes(query),
               )
-            : records;
+            : entries;
 
         const entryEmpty = editorIsEmpty();
 
@@ -275,7 +290,9 @@ function renderSavedMenu() {
         }
 
         savedList.replaceChildren(
-            ...filtered.map((record) => savedRow(record, entryEmpty)),
+            ...filtered.map(({ record, preview }) =>
+                savedRow(record, entryEmpty, preview),
+            ),
         );
         savedSaveBtn.disabled = entryEmpty;
 
