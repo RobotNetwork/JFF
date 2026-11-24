@@ -735,23 +735,51 @@ function listItemsInSelection() {
     );
 }
 
+function isLineBoundary(node) {
+    if (!node || node.nodeType !== Node.ELEMENT_NODE) return false;
+
+    const tag = node.tagName.toLowerCase();
+
+    return tag === "br" || blockLevelTags.has(tag);
+}
+
+function bareLineNodes(boundary) {
+    const nodes = [];
+    let cursor = boundary ? boundary.nextSibling : editor.firstChild;
+
+    while (cursor && !isLineBoundary(cursor)) {
+        nodes.push(cursor);
+        cursor = cursor.nextSibling;
+    }
+
+    return nodes;
+}
+
+function insertBareLineContainer(boundary, container, target, nodes) {
+    if (nodes.length > 0) {
+        nodes[0].before(container);
+        for (const node of nodes) {
+            if (node.nodeType === Node.TEXT_NODE && node.data === "") {
+                node.remove();
+            } else {
+                target.appendChild(node);
+            }
+        }
+    } else if (boundary && boundary.parentNode === editor) {
+        boundary.after(container);
+    } else {
+        editor.prepend(container);
+    }
+}
+
 /*
- * The line the caret sits on becomes the first item of a new list. A line is
- * a block element; in an empty editor it is a bare text node, which moves
- * into the item whole rather than handing over children it does not have.
+ * The line the caret sits on becomes the first item of a new list.
  */
 function listifyLine(line, tag) {
     const list = document.createElement(tag);
     const item = document.createElement("li");
-    const parent = line.parentNode;
-    const position = line.nextSibling;
-    const isText = line.nodeType === Node.TEXT_NODE;
 
-    if (isText) {
-        item.appendChild(line);
-    } else {
-        while (line.firstChild) item.appendChild(line.firstChild);
-    }
+    while (line.firstChild) item.appendChild(line.firstChild);
 
     /*
      * An empty item leaves the caret nowhere to sit, so it carries an empty
@@ -760,28 +788,35 @@ function listifyLine(line, tag) {
     if (!item.firstChild) item.appendChild(document.createTextNode(""));
 
     list.appendChild(item);
-
-    if (isText) {
-        parent.insertBefore(list, position);
-    } else {
-        line.replaceWith(list);
-    }
+    line.replaceWith(list);
 
     return item;
 }
 
-/*
- * The line the caret sits on. That is the block holding it, except in an
- * editor that holds nothing but text, where the line is a bare text node.
- * A caret between children is reported against the editor element itself,
- * and the line is then the child in front of it.
- */
-function caretLine(block, range) {
-    if (block !== editor) return block;
+function listifyBareLine(boundary, tag) {
+    const nodes = bareLineNodes(boundary);
+    const list = document.createElement(tag);
+    const item = document.createElement("li");
 
-    if (range.startContainer !== editor) return range.startContainer;
+    list.appendChild(item);
+    insertBareLineContainer(boundary, list, item, nodes);
 
-    return editor.childNodes[range.startOffset - 1] || null;
+    if (!item.firstChild) item.appendChild(document.createTextNode(""));
+
+    return item;
+}
+
+function formatBareLine(boundary, tag) {
+    const nodes = bareLineNodes(boundary);
+    const element = document.createElement(tag);
+
+    insertBareLineContainer(boundary, element, element, nodes);
+
+    if (!element.textContent && !element.querySelector("br")) {
+        element.replaceChildren(document.createElement("br"));
+    }
+
+    placeCaret(element);
 }
 
 /*
@@ -806,9 +841,15 @@ function precedingBreak(block, range) {
         cursor = cursor ? cursor.previousSibling : null;
     }
 
+    const stopAtBlock = block === editor;
+
     while (cursor) {
-        if (cursor.nodeType === Node.ELEMENT_NODE && cursor.tagName === "BR") {
-            return cursor;
+        if (cursor.nodeType === Node.ELEMENT_NODE) {
+            const tag = cursor.tagName.toLowerCase();
+
+            if (tag === "br" || (stopAtBlock && blockLevelTags.has(tag))) {
+                return cursor;
+            }
         }
         cursor = cursor.previousSibling;
     }
@@ -891,11 +932,6 @@ function applyTypedMarker() {
 
     if (!heading && !quote && !listMarkerPattern.test(prefix)) return false;
 
-    let line = caretLine(block, range);
-
-    // The editor is not a line, and replacing it would take the page apart.
-    if (!line || line === editor) return false;
-
     const blockMarker = Boolean(heading || quote);
 
     /*
@@ -907,16 +943,20 @@ function applyTypedMarker() {
     flushSnapshot();
 
     if (blockMarker) {
-        removeMarker(line, range, prefix, br);
+        const tag = heading ? `h${heading[1].length}` : "blockquote";
 
-        if (br && block !== editor) {
-            line = splitBlockAtBreak(block, br);
-        }
+        removeMarker(block, range, br);
 
-        formatLine(line, heading ? `h${heading[1].length}` : "blockquote");
+        if (block === editor) {
+            formatBareLine(br, tag);
 
-        if (br && block === editor && br.parentNode === editor) {
-            br.remove();
+            if (br && br.tagName === "BR" && br.parentNode === editor) {
+                br.remove();
+            }
+        } else {
+            const line = br ? splitBlockAtBreak(block, br) : block;
+
+            formatLine(line, tag);
         }
 
         return true;
@@ -926,7 +966,7 @@ function applyTypedMarker() {
     const nested = /^[ \t\u00a0]/.test(prefix);
     const tag = /^[ \t\u00a0]*[-*+]/.test(prefix) ? "ul" : "ol";
 
-    removeMarker(line, range, prefix, br);
+    removeMarker(block, range, br);
 
     let item = existing;
 
@@ -941,16 +981,16 @@ function applyTypedMarker() {
         ) {
             item = switchListItemType(existing, tag);
         }
-    } else {
-        if (br && block !== editor) {
-            line = splitBlockAtBreak(block, br);
-        }
+    } else if (block === editor) {
+        item = listifyBareLine(br, tag);
 
-        item = listifyLine(line, tag);
-
-        if (br && block === editor && br.parentNode === editor) {
+        if (br && br.tagName === "BR" && br.parentNode === editor) {
             br.remove();
         }
+    } else {
+        const line = br ? splitBlockAtBreak(block, br) : block;
+
+        item = listifyLine(line, tag);
     }
 
     placeCaret(item);
@@ -1080,23 +1120,17 @@ function runBeforeCaret(node, closeOffset) {
 }
 
 /*
- * The marker is markup, not content, so it never reaches the block. A bare
- * text node is trimmed in place rather than deleted, since it is about to
- * become the block's content, and the marker is its entire text up to the
- * caret.
+ * The marker is markup, not content, so it never reaches the block. Deleting
+ * via a Range from the line boundary to the caret handles markers split
+ * across adjacent text nodes without risking IndexSizeError.
  */
-function removeMarker(line, range, prefix, br = null) {
-    if (line.nodeType === Node.TEXT_NODE) {
-        line.deleteData(0, prefix.length);
-        return;
-    }
-
+function removeMarker(block, range, br = null) {
     const marker = document.createRange();
 
     if (br) {
         marker.setStartAfter(br);
     } else {
-        marker.selectNodeContents(line);
+        marker.selectNodeContents(block);
     }
 
     marker.setEnd(range.startContainer, range.startOffset);
@@ -1273,7 +1307,7 @@ function highestClearedInline(node) {
 function rangeHasContent(range) {
     if (range.toString() !== "") return true;
 
-    return Boolean(range.cloneContents().querySelector("*"));
+    return Boolean(range.cloneContents().querySelector("br"));
 }
 
 function splitClearedInlineAt(ancestor, container, offset) {
