@@ -1553,9 +1553,12 @@ body.is-resizing * {
 }
 
 /* Two columns, wider than the single-field dialogs: the section list on the
-   left, the setting beside it on the right. */
+   left, the setting beside it on the right. The height is fixed rather than
+   fitted to the active panel so switching sections or expanding details never
+   resizes the dialog or shifts the sidebar under the pointer. */
 .settings-form {
     width: min(34rem, calc(100vw - 32px));
+    height: min(28rem, calc(100dvh - 32px));
     max-height: calc(100dvh - 32px);
 }
 
@@ -1607,8 +1610,9 @@ body.is-resizing * {
 .settings-panels {
     flex: 1;
     min-width: 0;
-    min-height: 10rem;
+    min-height: 0;
     overflow-y: auto;
+    scrollbar-gutter: stable;
     padding-left: 12px;
 }
 

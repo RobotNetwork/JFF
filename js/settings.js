@@ -21,6 +21,8 @@ function showSettingsPanel(name) {
     for (const panel of document.querySelectorAll(".settings-panel")) {
         panel.hidden = panel.dataset.panel !== name;
     }
+
+    if (settingsPanels) settingsPanels.scrollTop = 0;
 }
 
 /* showModal throws on a dialog that is already open. */

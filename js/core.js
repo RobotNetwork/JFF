@@ -58,6 +58,7 @@ const nameSubmit = document.getElementById("nameSubmit");
 const settingsBtn = document.getElementById("settingsBtn");
 const settingsDialog = document.getElementById("settingsDialog");
 const settingsNav = document.getElementById("settingsNav");
+const settingsPanels = settingsDialog.querySelector(".settings-panels");
 const settingsClose = document.getElementById("settingsClose");
 const accentInput = document.getElementById("accentInput");
 const accentResetBtn = document.getElementById("accentResetBtn");

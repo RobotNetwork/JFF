@@ -235,7 +235,7 @@ function isMacPlatform(
 /*
  * Typing triggers and pointer/paste gestures that are not modifier chords
  * in editingShortcuts, shown in the "Typing and gestures" section of
- * Keyboard shortcuts.
+ * Settings.
  */
 function getExtraShortcuts(mac = isMacPlatform()) {
     return [

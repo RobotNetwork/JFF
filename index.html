@@ -715,6 +715,16 @@
                             <button
                                 type="button"
                                 class="settings-nav-item"
+                                data-panel="gestures"
+                            >
+                                Typing and gestures
+                            </button>
+                        </li>
+
+                        <li>
+                            <button
+                                type="button"
+                                class="settings-nav-item"
                                 data-panel="tutorial"
                             >
                                 How it works
@@ -842,8 +852,15 @@
                                 id="shortcutList"
                                 role="list"
                             ></ul>
+                        </section>
 
-                            <h4>Typing and gestures</h4>
+                        <section
+                            class="settings-panel"
+                            id="settingsPanel-gestures"
+                            data-panel="gestures"
+                            hidden
+                        >
+                            <h3>Typing and gestures</h3>
 
                             <ul
                                 class="shortcut-list"
@@ -883,12 +900,12 @@
                                 <summary>ServiceNow setup</summary>
 
                                 <p>
-                                    Three admin-controlled properties decide
-                                    whether the pasted markup renders. They
-                                    live in System Properties &gt; All
-                                    Properties
-                                    (<code>sys_properties.list</code>), or in
-                                    Instance Security Center.
+                                    Three admin-controlled properties govern how
+                                    journal HTML behaves. Look them up by typing
+                                    <code>sys_properties.list</code> in the
+                                    navigation filter; security properties also
+                                    surface in Security Center (formerly
+                                    Instance Security Center).
                                 </p>
 
                                 <dl class="settings-props">
@@ -900,8 +917,9 @@
                                     <dd>
                                         Renders HTML inside
                                         <code>[code]</code> tags. Default
-                                        true; many security baselines set it
-                                        false, and the tags then appear as
+                                        <code>true</code>; many security
+                                        baselines set it <code>false</code>, in
+                                        which case the tags and markup appear as
                                         plain text.
                                     </dd>
 
@@ -911,9 +929,10 @@
                                         >
                                     </dt>
                                     <dd>
-                                        Runs journal HTML through the
-                                        sanitizer, which removes disallowed
-                                        elements and attributes. The allow and
+                                        Default <code>true</code>. Enables the
+                                        HTML sanitizer globally for HTML fields,
+                                        stripping disallowed elements and
+                                        attributes. The sanitizer's allow and
                                         deny lists live in the
                                         <code>HTMLSanitizerConfig</code>
                                         script include under System Definition
@@ -924,20 +943,25 @@
                                         <code>glide.ui.journal.use_html</code>
                                     </dt>
                                     <dd>
-                                        Set to true to add a rich text editor
-                                        to journal fields in the Activity
-                                        stream. Optional; this page works
-                                        without it, and many large enterprises
-                                        leave it off because it changes the
-                                        field for everyone.
+                                        Default <code>false</code>. Set to
+                                        <code>true</code> to enable a native
+                                        rich-text editor on journal fields
+                                        (primarily in Workspaces). Optional:
+                                        this page works without it, and many
+                                        enterprises leave it off because it
+                                        changes journal fields globally and can
+                                        affect portals or integrations expecting
+                                        plain text.
                                     </dd>
                                 </dl>
 
                                 <p>
-                                    If a tag disappears after posting, the
-                                    sanitizer or <code>allow_codetag</code>
-                                    is the place to look. Scripts are never
-                                    part of the output.
+                                    If raw <code>[code]</code> tags appear as
+                                    plain text, check
+                                    <code>allow_codetag</code>. If specific tags
+                                    or attributes disappear after posting, check
+                                    <code>HTMLSanitizerConfig</code>. Scripts
+                                    are never part of this tool's output.
                                 </p>
                             </details>
                         </section>
