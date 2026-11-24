@@ -161,20 +161,21 @@ const commands = {
     /*
      * Undo and redo walk the snapshot stack rather than running a document
      * command: the browser's own history does not survive setting innerHTML,
-     * which is what restoring a snapshot does.
+     * which is what restoring a snapshot does. Both return true because
+     * restore() already renders and updates the toolbar state.
      */
     undo: {
         run: () => {
             restore(-1);
 
-            return false;
+            return true;
         },
     },
     redo: {
         run: () => {
             restore(1);
 
-            return false;
+            return true;
         },
     },
     bold: {

@@ -29,17 +29,14 @@
 
 /*
  * Dark is the default whatever the system asks for; the toggle in the header
- * reads the saved choice and writes data-theme on the root. Only the editor
- * card takes the light palette. The page chrome around it (the header, the
- * action row, the dialogs and the notice) keeps the dark one, so the field is
- * the single surface whose colour changes and the theme switch still reports
- * the choice it made.
+ * reads the saved choice and writes data-theme on the root, switching the
+ * entire page to the light palette.
  *
  * The light palette is the same set of roles as the dark one, so nothing
  * below this block names a colour that has to change with the theme. The
- * accent roles are not repeated here: they inherit from the root, where
- * Settings writes a custom accent inline, and redeclaring them would shadow
- * that choice inside the card.
+ * accent roles are not repeated here: they live on :root (where Settings
+ * writes a custom accent inline), except --accent-text, which is re-evaluated
+ * here against the light --text.
  */
 :root[data-theme="light"] {
     color-scheme: light;
@@ -230,10 +227,6 @@ main {
  * is what makes it read as a card now that a divider no longer separates it
  * from anything.
  *
- * The card carries its own fill because the light palette is scoped to it:
- * the body behind it stays dark, so without this the field's light text would
- * sit on the page colour. In the dark theme this is the body colour again.
- *
  * Nothing here clips. The toolbar's menus open over the editor, and the saved
  * menu opens upward from the row beneath the card; clipping the card to round
  * its corners would cut either one off. The toolbar rounds its top corners to
@@ -245,10 +238,6 @@ main {
     border: 1px solid var(--border);
     border-radius: 8px;
     background: var(--bg);
-    /*
-     * Body resolves its colour against the dark palette and everything would
-     * otherwise inherit that resolved value, not the card's own --text.
-     */
     color: var(--text);
 }
 
@@ -750,7 +739,7 @@ body.is-resizing * {
 #copyBtn.is-copied,
 #copyBtn.is-copied:disabled {
     border-color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 22%, var(--panel));
+    background: rgba(var(--accent-rgb), 0.22);
     color: var(--accent-text);
     font-weight: 600;
 }

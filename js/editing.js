@@ -518,15 +518,6 @@ function caretBlock(node) {
     return block;
 }
 
-function textBefore(element, range) {
-    const prefix = document.createRange();
-
-    prefix.selectNodeContents(element);
-    prefix.setEnd(range.startContainer, range.startOffset);
-
-    return prefix.toString();
-}
-
 /*
  * The end of the item's own text, which is its content without the nested
  * lists that hang off it. Its children are included, so an item whose text
