@@ -15,6 +15,45 @@ function escapeAttr(value) {
     return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 }
 
+function normalizeHref(value) {
+    const href = value.trim();
+
+    if (!href || /[\s\p{Cc}]/u.test(href)) return "";
+
+    if (/^https?:\/\/[^/\\]/i.test(href)) {
+        try {
+            const url = new URL(href);
+            return url.hostname ? href : "";
+        } catch {
+            return "";
+        }
+    }
+
+    if (/^mailto:[^\s@]+@[^\s@]+/i.test(href)) return href;
+
+    if (/^tel:[+\d().\-*#]+$/i.test(href) && /\d/.test(href)) return href;
+
+    if (href.startsWith("#") && href.length > 1) return href;
+
+    /*
+     * A single leading slash is a same-site path. Two of them, or a slash
+     * followed by a backslash, is resolved off-host by the browser.
+     */
+    if (
+        href.startsWith("/") &&
+        !href.startsWith("//") &&
+        !href.startsWith("/\\")
+    ) {
+        return href;
+    }
+
+    return "";
+}
+
+function isAbsoluteHref(href) {
+    return /^(?:https?:\/\/|mailto:|tel:)/i.test(href);
+}
+
 /*
  * A line that carries code rather than prose: punctuation that only appears
  * in code, a statement-leading language keyword, uppercase SQL clauses, a

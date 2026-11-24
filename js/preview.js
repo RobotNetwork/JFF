@@ -2,6 +2,121 @@
    Split out of app.js, lines 3855-3910. Load order matters: keep the
    <script> tag for this file where index.html puts it. */
 
+/* ---------- Preview mirror ---------- */
+
+/*
+ * split() keeps the captured [code] regions at odd indices. Matching is
+ * case-insensitive to align with ServiceNow's [code] parser.
+ */
+const codeRegion = new RegExp(
+    `(${escapeRegExp(codeOpen)}[\\s\\S]*?${escapeRegExp(codeClose)})`,
+    "i",
+);
+
+/*
+ * The preview's content, built from the serialized markup rather than from the
+ * editor a second time: the entry is what ServiceNow will hold, and a preview
+ * taken from anywhere else could agree with the editor while disagreeing with
+ * the field.
+ *
+ * The [code] delimiters come off, since ServiceNow reads them rather than
+ * showing them, and what they held is the HTML it renders. Everywhere else the
+ * markup is kept as it is and each newline becomes the line break the captured
+ * page shows: ServiceNow stores the entry and renders it, so a newline between
+ * two blocks is a <br> on screen.
+ */
+const mirrorAllowedTags = new Set([
+    "b",
+    "em",
+    "strike",
+    "u",
+    "code",
+    "pre",
+    "blockquote",
+    "a",
+    "ul",
+    "ol",
+    "li",
+    "p",
+    "br",
+    ...headingLevels,
+]);
+
+function sanitizeMirrorFragment(root) {
+    for (const element of [...root.querySelectorAll("*")]) {
+        const tag = element.tagName.toLowerCase();
+
+        if (!mirrorAllowedTags.has(tag)) {
+            element.remove();
+            continue;
+        }
+
+        for (const attribute of [...element.attributes]) {
+            const isAllowedHref =
+                tag === "a" &&
+                attribute.name.toLowerCase() === "href" &&
+                normalizeHref(attribute.value) !== "";
+
+            if (!isAllowedHref) {
+                element.removeAttribute(attribute.name);
+            }
+        }
+
+        if (tag === "a") {
+            if (!element.hasAttribute("href")) {
+                element.replaceWith(...element.childNodes);
+            } else {
+                element.target = "_blank";
+                element.rel = "noopener noreferrer";
+            }
+        }
+    }
+}
+
+/*
+ * Prose with its newlines rendered as line breaks. Plain text outside [code]
+ * is rendered literally by ServiceNow, so it is built directly from Text nodes
+ * and <br> elements without parsing HTML.
+ */
+function linesToBreaks(text) {
+    const lines = document.createDocumentFragment();
+
+    text.split("\n").forEach((line, index) => {
+        if (index > 0) lines.append(document.createElement("br"));
+        if (line) lines.append(document.createTextNode(line));
+    });
+
+    return lines;
+}
+
+function mirrorNodes(body) {
+    const fragment = document.createDocumentFragment();
+
+    body.split(codeRegion).forEach((part, index) => {
+        if (part === "") return;
+
+        if (index % 2 === 0) {
+            fragment.append(linesToBreaks(part));
+            return;
+        }
+
+        const region = document.createElement("template");
+
+        region.innerHTML = part.slice(codeOpen.length, -codeClose.length);
+        sanitizeMirrorFragment(region.content);
+
+        fragment.append(region.content);
+    });
+
+    return fragment;
+}
+
+function renderMirror(body) {
+    mirror.replaceChildren(mirrorNodes(body));
+    mirror.classList.toggle("is-empty", body === "");
+    previewRaw.textContent = body;
+}
+
 /* ---------- Preview dialog ---------- */
 
 /*

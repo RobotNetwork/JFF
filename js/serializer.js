@@ -45,8 +45,9 @@ const codeBreakSelector = [...codeBreakTags].join(", ");
 /*
  * The delimiter ServiceNow reads as a code region. The three places that
  * spell it out - minting it in wrapCode, splitting it back out in codeRegion,
- * and breaking one typed as prose in serializeText - all derive from these,
- * so the wire format has one definition and no site can drift alone.
+ * and breaking one typed as prose in neutralizeProseDelimiters - all derive
+ * from these, so the wire format has one definition and no site can drift
+ * alone.
  */
 const codeTag = "code";
 const codeOpen = `[${codeTag}]`;
@@ -54,21 +55,13 @@ const codeClose = `[/${codeTag}]`;
 
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/*
- * split() keeps the captured [code] regions at odd indices. Only the prose
- * is tidied, so code keeps its trailing whitespace and blank lines.
- * Matching is case-insensitive to align with ServiceNow's [code] parser.
- */
-const codeRegion = new RegExp(
-    `(${escapeRegExp(codeOpen)}[\\s\\S]*?${escapeRegExp(codeClose)})`,
-    "i",
-);
-
 /* A delimiter typed as prose or inside HTML, whole, so it can be neutralized. */
 const typedCodeDelimiter = new RegExp(
     `${escapeRegExp(codeOpen)}|${escapeRegExp(codeClose)}`,
     "gi",
 );
+
+const openBracketEntity = `&#${"[".codePointAt(0)};`;
 
 /*
  * Inside [code] ServiceNow renders HTML, so replacing the leading bracket of
@@ -78,51 +71,12 @@ const typedCodeDelimiter = new RegExp(
  */
 function escapeCodeDelimiters(html) {
     return html.replace(typedCodeDelimiter, (delimiter) =>
-        delimiter.replace("[", "&#91;"),
+        delimiter.replace("[", openBracketEntity),
     );
 }
 
 function wrapCode(html) {
     return html ? `${codeOpen}${escapeCodeDelimiters(html)}${codeClose}` : "";
-}
-
-function normalizeHref(value) {
-    const href = value.trim();
-
-    if (!href || /[\s\u0000-\u001f]/.test(href)) return "";
-
-    if (/^https?:\/\/[^/\\]/i.test(href)) {
-        try {
-            const url = new URL(href);
-            return url.hostname ? href : "";
-        } catch {
-            return "";
-        }
-    }
-
-    if (/^mailto:[^\s@]+@[^\s@]+/i.test(href)) return href;
-
-    if (/^tel:[+\d().\-*#]+$/i.test(href) && /\d/.test(href)) return href;
-
-    if (href.startsWith("#") && href.length > 1) return href;
-
-    /*
-     * A single leading slash is a same-site path. Two of them, or a slash
-     * followed by a backslash, is resolved off-host by the browser.
-     */
-    if (
-        href.startsWith("/") &&
-        !href.startsWith("//") &&
-        !href.startsWith("/\\")
-    ) {
-        return href;
-    }
-
-    return "";
-}
-
-function isAbsoluteHref(href) {
-    return /^(?:https?:\/\/|mailto:|tel:)/i.test(href);
 }
 
 /*
@@ -170,25 +124,21 @@ function neutralizeProseDelimiters(text) {
         );
 }
 
-function serializeText(node, insideCode, inCodeElement = false) {
+function serializeCodeText(node, inCodeElement = false) {
     const text = node.textContent.replace(/\u00a0/g, " ");
 
-    if (insideCode) {
-        /*
-         * Inside [code] ServiceNow renders HTML, so literal characters must
-         * be escaped and [code]/[/code] delimiters neutralized as entities.
-         * Typographic punctuation normalization (curly quotes, dashes, zero-
-         * width characters) is scoped to actual <code>/<pre> elements so
-         * formatted prose and ZWJ emojis survive intact.
-         */
-        const clean = inCodeElement
-            ? normalizeCodePunctuation(text)
-            : text.replace(/\u200b/g, "");
+    /*
+     * Inside [code] ServiceNow renders HTML, so literal characters must
+     * be escaped and [code]/[/code] delimiters neutralized as entities.
+     * Typographic punctuation normalization (curly quotes, dashes, zero-
+     * width characters) is scoped to actual <code>/<pre> elements so
+     * formatted prose and ZWJ emojis survive intact.
+     */
+    const clean = inCodeElement
+        ? normalizeCodePunctuation(text)
+        : text.replace(/\u200b/g, "");
 
-        return escapeCodeDelimiters(escapeHtml(clean));
-    }
-
-    return neutralizeProseDelimiters(text);
+    return escapeCodeDelimiters(escapeHtml(clean));
 }
 
 /*
@@ -206,18 +156,16 @@ function isParagraphBlock(node) {
 /*
  * Inside [code] line structure is explicit: ServiceNow strips newlines and
  * <br>, so a paragraph is separated from its siblings by an empty <p></p>
- * rather than by a newline. Outside [code] the newline each block appends is
- * the break, and no separator is inserted.
+ * rather than by a newline.
  */
-function serializeChildren(node, insideCode, inCodeElement = false) {
+function serializeChildren(node, inCodeElement = false) {
     let html = "";
     let previous = null;
 
     for (const child of node.childNodes) {
-        const part = serializeNode(child, insideCode, inCodeElement);
+        const part = serializeCodeNode(child, inCodeElement);
 
         if (
-            insideCode &&
             previous &&
             part !== "" &&
             !html.endsWith("<p></p>") &&
@@ -312,11 +260,7 @@ function serializeHtmlElement(element, inCodeElement = false) {
         return `<pre><code>${escapeCodeDelimiters(escapeHtml(text))}</code></pre>`;
     }
 
-    const inner = serializeChildren(
-        element,
-        true,
-        inCodeElement || tag === "code",
-    );
+    const inner = serializeChildren(element, inCodeElement || tag === "code");
 
     /*
      * ServiceNow keeps the level it is given, so an h1 stays an h1 instead of
@@ -361,7 +305,7 @@ function serializeHtmlElement(element, inCodeElement = false) {
 
             const safeHref = href.replace(
                 /^(https?:\/\/\[[0-9a-f:.]+\])|[\[\]]/gi,
-                (match, ipv6) => ipv6 || (match === "[" ? "%5B" : "%5D"),
+                (match, ipv6) => ipv6 || encodeURIComponent(match),
             );
 
             return `<a href="${escapeAttr(safeHref)}">${inner}</a>`;
@@ -396,169 +340,22 @@ function serializeHtmlElement(element, inCodeElement = false) {
     }
 }
 
-function serializeNode(node, insideCode = false, inCodeElement = false) {
+function serializeCodeNode(node, inCodeElement = false) {
     if (node.nodeType === Node.TEXT_NODE) {
-        return serializeText(node, insideCode, inCodeElement);
+        return serializeCodeText(node, inCodeElement);
     }
 
     if (node.nodeType !== Node.ELEMENT_NODE) {
         return "";
     }
 
-    const tag = node.tagName.toLowerCase();
-
-    if (insideCode) {
-        return serializeHtmlElement(node, inCodeElement);
-    }
-
-    if (tag === "p" || tag === "div") {
-        const content = serializeChildren(node, false);
-
-        if (!content) return "\n";
-
-        /*
-         * A block that already ends with a child's newline - a list or a
-         * blockquote wrapped in a paragraph - must not add a second one,
-         * which would show up as a blank line before whatever follows.
-         */
-        return content.endsWith("\n") ? content : `${content}\n`;
-    }
-
-    /*
-     * A list item outside a list carries its own line, so a fragment of bare
-     * <li> elements does not serialize as one joined line.
-     */
-    if (tag === "li") {
-        const content = serializeChildren(node, false);
-
-        return content ? `${content}\n` : "\n";
-    }
-
-    if (tag === "br") {
-        return "\n";
-    }
-
-    if (inlineTags.has(tag) || blockTags.has(tag)) {
-        const html = serializeHtmlElement(node);
-
-        if (!html) return "";
-
-        const suffix = blockTags.has(tag) ? "\n" : "";
-
-        return `${wrapCode(html)}${suffix}`;
-    }
-
-    return serializeChildren(node, false);
+    return serializeHtmlElement(node, inCodeElement);
 }
 
 function tidyProse(text) {
     return text
         .replace(/[ \t]+\n/g, "\n")
         .replace(/\n{3,}/g, "\n\n");
-}
-
-/*
- * The preview's content, built from the serialized markup rather than from the
- * editor a second time: the entry is what ServiceNow will hold, and a preview
- * taken from anywhere else could agree with the editor while disagreeing with
- * the field.
- *
- * The [code] delimiters come off, since ServiceNow reads them rather than
- * showing them, and what they held is the HTML it renders. Everywhere else the
- * markup is kept as it is and each newline becomes the line break the captured
- * page shows: ServiceNow stores the entry and renders it, so a newline between
- * two blocks is a <br> on screen.
- */
-const mirrorAllowedTags = new Set([
-    "b",
-    "em",
-    "strike",
-    "u",
-    "code",
-    "pre",
-    "blockquote",
-    "a",
-    "ul",
-    "ol",
-    "li",
-    "p",
-    "br",
-    ...headingLevels,
-]);
-
-function sanitizeMirrorFragment(root) {
-    for (const element of [...root.querySelectorAll("*")]) {
-        const tag = element.tagName.toLowerCase();
-
-        if (!mirrorAllowedTags.has(tag)) {
-            element.remove();
-            continue;
-        }
-
-        for (const attribute of [...element.attributes]) {
-            const isAllowedHref =
-                tag === "a" &&
-                attribute.name.toLowerCase() === "href" &&
-                normalizeHref(attribute.value) !== "";
-
-            if (!isAllowedHref) {
-                element.removeAttribute(attribute.name);
-            }
-        }
-
-        if (tag === "a") {
-            if (!element.hasAttribute("href")) {
-                element.replaceWith(...element.childNodes);
-            } else {
-                element.target = "_blank";
-                element.rel = "noopener noreferrer";
-            }
-        }
-    }
-}
-
-function mirrorNodes(body) {
-    const fragment = document.createDocumentFragment();
-
-    body.split(codeRegion).forEach((part, index) => {
-        if (part === "") return;
-
-        if (index % 2 === 0) {
-            fragment.append(linesToBreaks(part));
-            return;
-        }
-
-        const region = document.createElement("template");
-
-        region.innerHTML = part.slice(codeOpen.length, -codeClose.length);
-        sanitizeMirrorFragment(region.content);
-
-        fragment.append(region.content);
-    });
-
-    return fragment;
-}
-
-/*
- * Prose with its newlines rendered as line breaks. Plain text outside [code]
- * is rendered literally by ServiceNow, so it is built directly from Text nodes
- * and <br> elements without parsing HTML.
- */
-function linesToBreaks(text) {
-    const lines = document.createDocumentFragment();
-
-    text.split("\n").forEach((line, index) => {
-        if (index > 0) lines.append(document.createElement("br"));
-        if (line) lines.append(document.createTextNode(line));
-    });
-
-    return lines;
-}
-
-function renderMirror(body) {
-    mirror.replaceChildren(mirrorNodes(body));
-    mirror.classList.toggle("is-empty", body === "");
-    previewRaw.textContent = body;
 }
 
 function pushProsePart(parts, text) {
