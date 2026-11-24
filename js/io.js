@@ -27,7 +27,15 @@ async function importSaved(file) {
 
         if (!Array.isArray(parsed)) throw new Error("not a list");
 
-        incoming = parsed.map(savedRecord).filter(Boolean);
+        incoming = parsed
+            .map(savedRecord)
+            .filter(Boolean)
+            .map((record) => {
+                const { html } = sanitizeEntryHtml(record.html);
+
+                return html ? { ...record, html } : null;
+            })
+            .filter(Boolean);
     } catch {
         showNotice("That file is not a saved-messages export.", {
             tone: "error",

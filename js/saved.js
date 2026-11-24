@@ -134,9 +134,14 @@ function writeSaved(records) {
  * a line break as a break too, since that is what the editor means by one.
  */
 const messageBreakSelector = `${blockSelector}, br`;
+const droppedTagsSelector = [...droppedTags].join(", ");
 
 function messageText(html) {
     const doc = new DOMParser().parseFromString(html, "text/html");
+
+    for (const element of doc.body.querySelectorAll(droppedTagsSelector)) {
+        element.remove();
+    }
 
     for (const element of doc.body.querySelectorAll(messageBreakSelector)) {
         element.after("\n");
