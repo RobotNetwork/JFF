@@ -1,8 +1,8 @@
-/* ServiceNow [code] serializer.
-   Split out of app.js, lines 2875-3347. Load order matters: keep the
-   <script> tag for this file where index.html puts it. */
+/* ServiceNow journal markup formatter.
+   Load order matters: keep the <script> tag for this file where index.html
+   puts it. */
 
-/* ---------- ServiceNow serializer ---------- */
+/* ---------- ServiceNow formatter ---------- */
 
 const inlineTags = new Set([
     "b",
@@ -43,35 +43,23 @@ const codeBreakTags = new Set([
 const codeBreakSelector = [...codeBreakTags].join(", ");
 
 /*
- * The delimiter ServiceNow reads as a code region. The three places that
- * spell it out - minting it in wrapCode, splitting it back out in codeRegion,
- * and breaking one typed as prose in neutralizeProseDelimiters - all derive
- * from these, so the wire format has one definition and no site can drift
- * alone.
+ * The delimiter ServiceNow reads as a code region. Minting in wrapCode,
+ * breaking typed delimiters in neutralizeProseDelimiters, and escaping them
+ * inside HTML all share these constants.
  */
-const codeTag = "code";
-const codeOpen = `[${codeTag}]`;
-const codeClose = `[/${codeTag}]`;
-
-const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-/* A delimiter typed as prose or inside HTML, whole, so it can be neutralized. */
-const typedCodeDelimiter = new RegExp(
-    `${escapeRegExp(codeOpen)}|${escapeRegExp(codeClose)}`,
-    "gi",
-);
-
-const openBracketEntity = `&#${"[".codePointAt(0)};`;
+const codeOpen = "[code]";
+const codeClose = "[/code]";
+const typedCodeDelimiter = /\[\/?code\]/gi;
+const openBracketCode = 91;
 
 /*
- * Inside [code] ServiceNow renders HTML, so replacing the leading bracket of
- * any case-insensitive [code] or [/code] delimiter with its numeric entity
- * prevents it from terminating the outer region while rendering the literal
- * ASCII bracket in ServiceNow and the preview.
+ * Inside a code region ServiceNow renders HTML, so replacing the leading
+ * bracket of any case-insensitive delimiter with its numeric entity prevents
+ * it from terminating the outer region while rendering the literal bracket.
  */
 function escapeCodeDelimiters(html) {
     return html.replace(typedCodeDelimiter, (delimiter) =>
-        delimiter.replace("[", openBracketEntity),
+        delimiter.replace("[", `&#${openBracketCode};`),
     );
 }
 
@@ -79,71 +67,78 @@ function wrapCode(html) {
     return html ? `${codeOpen}${escapeCodeDelimiters(html)}${codeClose}` : "";
 }
 
+function wrapTag(name, inner) {
+    return `<${name}>${inner}</${name}>`;
+}
+
+const emptyParagraph = wrapTag("p", "");
+const zeroWidthSpace = "\u200b";
+const nonBreakingSpace = "\u00a0";
+const hiddenCodeCharsPattern = /[\u200b-\u200d\ufeff]/g;
+
 /*
  * Word and Outlook autocorrect run before the paste reaches the browser, so
  * a code sample arrives with typographic punctuation: curly quotes, en and
  * em dashes, an ellipsis. Those characters break the code once it is pasted
- * out of ServiceNow, and inside [code] a straight ASCII character is what
- * was meant. Outside it the journal shows the text as written, which is
- * proper typography in prose, so this is scoped to code.
+ * out of ServiceNow, so straight ASCII replacements are scoped to code.
  */
-const codeTypography = [
-    [/\u200b|\u200c|\u200d|\ufeff/g, ""],
-    [/\u00a0/g, " "],
-    [/\u2018|\u2019|\u201b/g, "'"],
-    [/\u201c|\u201d|\u201f/g, '"'],
-    [/\u2026/g, "..."],
-    [/\u2013/g, "-"],
-    [/\u2014/g, "--"],
-];
+const typographyMap = {
+    "‘": "'",
+    "’": "'",
+    "‛": "'",
+    "“": '"',
+    "”": '"',
+    "‟": '"',
+    "…": "...",
+    "–": "-",
+    "—": "--",
+};
+
+function stripZeroWidth(text) {
+    return text.replaceAll(zeroWidthSpace, "");
+}
+
+function normalizeSpaces(text) {
+    return text.replaceAll(nonBreakingSpace, " ");
+}
 
 function normalizeCodePunctuation(text) {
-    return codeTypography.reduce(
-        (value, [pattern, replacement]) =>
-            value.replace(pattern, replacement),
-        text,
+    return normalizeSpaces(text.replace(hiddenCodeCharsPattern, "")).replace(
+        /[‘’‛“”‟…–—]/g,
+        (ch) => typographyMap[ch],
     );
 }
 
 function neutralizeProseDelimiters(text) {
     /*
-     * Outside [code] the journal shows the text as written, so escaping
-     * there would display entities instead of the characters typed. A
-     * delimiter written as literal prose would still mint a live region
-     * downstream, though, so a zero-width space after the bracket breaks it
-     * for the renderer while staying invisible. The zero-width spaces that
-     * hold a caret beside an inline code span are invisible too, and they are
-     * dropped before the delimiters are rewritten. Running this on assembled
-     * prose chunks prevents split text nodes or empty inline elements from
-     * forging a live [code] or [/code] delimiter.
+     * Outside code regions the journal shows text literally, so inserting a
+     * zero-width space after the bracket breaks typed delimiters for the
+     * downstream parser without changing what appears on screen.
      */
-    return text
-        .replace(/\u200b/g, "")
-        .replace(typedCodeDelimiter, (delimiter) =>
-            delimiter.replace("[", "[\u200b"),
-        );
+    return stripZeroWidth(text).replace(typedCodeDelimiter, (delimiter) =>
+        delimiter.replace("[", `[${zeroWidthSpace}`),
+    );
 }
 
 function serializeCodeText(node, inCodeElement = false) {
-    const text = node.textContent.replace(/\u00a0/g, " ");
+    const text = normalizeSpaces(node.textContent);
 
     /*
-     * Inside [code] ServiceNow renders HTML, so literal characters must
-     * be escaped and [code]/[/code] delimiters neutralized as entities.
-     * Typographic punctuation normalization (curly quotes, dashes, zero-
-     * width characters) is scoped to actual <code>/<pre> elements so
-     * formatted prose and ZWJ emojis survive intact.
+     * Inside a code region ServiceNow renders HTML, so literal characters must
+     * be escaped and delimiters neutralized as entities. Typographic
+     * punctuation normalization is scoped to code/pre elements so formatted
+     * prose and ZWJ emojis survive intact.
      */
     const clean = inCodeElement
         ? normalizeCodePunctuation(text)
-        : text.replace(/\u200b/g, "");
+        : stripZeroWidth(text);
 
     return escapeCodeDelimiters(escapeHtml(clean));
 }
 
 /*
- * A paragraph-like block inside [code]: its own end supplies the line break,
- * so no separator is needed between blocks of another kind.
+ * A paragraph-like block inside a code region: its own end supplies the line
+ * break, so no separator is needed between blocks of another kind.
  */
 function isParagraphBlock(node) {
     if (node.nodeType !== Node.ELEMENT_NODE) return false;
@@ -154,9 +149,9 @@ function isParagraphBlock(node) {
 }
 
 /*
- * Inside [code] line structure is explicit: ServiceNow strips newlines and
- * <br>, so a paragraph is separated from its siblings by an empty <p></p>
- * rather than by a newline.
+ * Inside a code region line structure is explicit: ServiceNow strips newlines
+ * and br tags, so a paragraph is separated from its siblings by an empty
+ * paragraph element rather than a newline.
  */
 function serializeChildren(node, inCodeElement = false) {
     let html = "";
@@ -168,10 +163,10 @@ function serializeChildren(node, inCodeElement = false) {
         if (
             previous &&
             part !== "" &&
-            !html.endsWith("<p></p>") &&
+            !html.endsWith(emptyParagraph) &&
             (isParagraphBlock(previous) || isParagraphBlock(child))
         ) {
-            html += "<p></p>";
+            html += emptyParagraph;
         }
 
         html += part;
@@ -234,7 +229,7 @@ function isSentinelBr(node) {
         if (sibling.nodeType === Node.ELEMENT_NODE) return false;
         if (
             sibling.nodeType === Node.TEXT_NODE &&
-            sibling.textContent.replace(/\u200b/g, "") !== ""
+            stripZeroWidth(sibling.textContent) !== ""
         ) {
             return false;
         }
@@ -247,53 +242,46 @@ function serializeHtmlElement(element, inCodeElement = false) {
     const tag = element.tagName.toLowerCase();
 
     if (tag === "pre") {
-        /*
-         * codeText descends through a <code> child and over <br> and block
-         * children, so a pre keeps every sibling of its code child instead
-         * of dropping all but the first. Computing it here also avoids a
-         * full child walk that the switch would otherwise discard.
-         */
         const text = normalizeCodePunctuation(
             codeText(element).replace(/^\n+|\n+$/g, ""),
         );
 
-        return `<pre><code>${escapeCodeDelimiters(escapeHtml(text))}</code></pre>`;
+        return wrapTag(
+            "pre",
+            wrapTag("code", escapeCodeDelimiters(escapeHtml(text))),
+        );
     }
 
     const inner = serializeChildren(element, inCodeElement || tag === "code");
 
-    /*
-     * ServiceNow keeps the level it is given, so an h1 stays an h1 instead of
-     * being rewritten to h3 or demoted to bold.
-     */
     if (headingLevels.includes(tag)) {
-        return `<${tag}>${inner}</${tag}>`;
+        return wrapTag(tag, inner);
     }
 
     switch (tag) {
         case "b":
         case "strong":
-            return inner ? `<b>${inner}</b>` : "";
+            return inner ? wrapTag("b", inner) : "";
 
         case "i":
         case "em":
-            return inner ? `<em>${inner}</em>` : "";
+            return inner ? wrapTag("em", inner) : "";
 
         case "s":
         case "strike":
         case "del":
-            return inner ? `<strike>${inner}</strike>` : "";
+            return inner ? wrapTag("strike", inner) : "";
 
         case "u":
         case "ins":
-            return inner ? `<u>${inner}</u>` : "";
+            return inner ? wrapTag("u", inner) : "";
 
         case "code":
             // Intentionally bold inline code for ServiceNow readability.
-            return inner ? `<b><code>${inner}</code></b>` : "";
+            return inner ? wrapTag("b", wrapTag("code", inner)) : "";
 
         case "blockquote":
-            return `<blockquote>${inner}</blockquote>`;
+            return wrapTag("blockquote", inner);
 
         case "a": {
             const href = normalizeHref(
@@ -303,33 +291,22 @@ function serializeHtmlElement(element, inCodeElement = false) {
             if (!href) return inner;
             if (!inner) return "";
 
-            const safeHref = href.replace(
-                /^(https?:\/\/\[[0-9a-f:.]+\])|[\[\]]/gi,
-                (match, ipv6) => ipv6 || encodeURIComponent(match),
-            );
+            const safeHref = escapeHrefBrackets(href);
 
             return `<a href="${escapeAttr(safeHref)}">${inner}</a>`;
         }
 
         case "ul":
         case "ol":
-            return `<${tag}>${inner}</${tag}>`;
+            return wrapTag(tag, inner);
 
         case "li":
-            return `<li>${inner}</li>`;
+            return wrapTag("li", inner);
 
         case "br":
-            /*
-             * Browser sentinel <br> tags at the end of empty or trailing blocks
-             * are placeholders for the caret, not real line breaks.
-             */
             if (isSentinelBr(element)) return "";
 
-            /*
-             * ServiceNow strips ordinary newlines and <br> inside [code].
-             * This is one of the few places where <p></p> is necessary.
-             */
-            return "<p></p>";
+            return emptyParagraph;
 
         case "p":
         case "div":
@@ -383,7 +360,7 @@ function partsEndWithNewline(parts) {
  */
 function collectSerializedParts(node, parts) {
     if (node.nodeType === Node.TEXT_NODE) {
-        pushProsePart(parts, node.textContent.replace(/\u00a0/g, " "));
+        pushProsePart(parts, normalizeSpaces(node.textContent));
         return;
     }
 

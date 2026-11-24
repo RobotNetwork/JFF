@@ -54,6 +54,13 @@ function isAbsoluteHref(href) {
     return /^(?:https?:\/\/|mailto:|tel:)/i.test(href);
 }
 
+function escapeHrefBrackets(href) {
+    return href.replace(
+        /^(https?:\/\/\[[0-9a-f:.]+\])|[\[\]]/gi,
+        (match, ipv6) => ipv6 || encodeURIComponent(match),
+    );
+}
+
 /*
  * A line that carries code rather than prose: punctuation that only appears
  * in code, a statement-leading language keyword, uppercase SQL clauses, a

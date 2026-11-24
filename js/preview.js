@@ -8,10 +8,7 @@
  * split() keeps the captured [code] regions at odd indices. Matching is
  * case-insensitive to align with ServiceNow's [code] parser.
  */
-const codeRegion = new RegExp(
-    `(${escapeRegExp(codeOpen)}[\\s\\S]*?${escapeRegExp(codeClose)})`,
-    "i",
-);
+const codeRegion = /(\[code\][\s\S]*?\[\/code\])/i;
 
 /*
  * The preview's content, built from the serialized markup rather than from the
